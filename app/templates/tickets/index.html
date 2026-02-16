@@ -2,6 +2,145 @@
 {% block title %}Tickets — {{ shop_name }}{% endblock %}
 
 {% block content %}
-<h4 class="mb-4">Tickets</h4>
-<p class="text-muted">This module will be built next.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Tickets</h4>
+</div>
+
+<!-- Search + Filters -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" action="{{ url_for('tickets.index') }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <input type="text" name="q" class="form-control form-control-sm"
+                 placeholder="Search ticket #, customer, device, fault…"
+                 value="{{ search }}">
+        </div>
+        <div class="col-md-2">
+          <select name="status" class="form-select form-select-sm">
+            <option value="">All Statuses</option>
+            {% for s in status_choices %}
+            <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select name="priority" class="form-select form-select-sm">
+            <option value="">All Priorities</option>
+            {% for p in priority_choices %}
+            <option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select name="technician" class="form-select form-select-sm">
+            <option value="">All Technicians</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}" {% if technician_filter == t.id|string %}selected{% endif %}>{{ t.full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 d-flex gap-1">
+          <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+            <i class="bi bi-search"></i> Filter
+          </button>
+          {% if search or status_filter or priority_filter or technician_filter %}
+          <a href="{{ url_for('tickets.index') }}" class="btn btn-sm btn-outline-secondary" title="Clear filters">
+            <i class="bi bi-x-lg"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Results -->
+{% if tickets %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Ticket #</th>
+        <th>Customer</th>
+        <th>Device</th>
+        <th>Fault</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Technician</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tickets %}
+      <tr>
+        <td>
+          <a href="{{ url_for('tickets.view', ticket_id=t.id) }}" class="text-decoration-none fw-semibold">
+            {{ t.ticket_number }}
+          </a>
+        </td>
+        <td>
+          <a href="{{ url_for('customers.view', customer_id=t.customer.id) }}" class="text-decoration-none">
+            {{ t.customer.full_name }}
+          </a>
+        </td>
+        <td class="small">{{ t.device.display_name if t.device else '—' }}</td>
+        <td class="small">{{ t.fault_description[:45] }}{% if t.fault_description|length > 45 %}…{% endif %}</td>
+        <td>
+          <span class="badge bg-{{ status_colours.get(t.status, 'secondary') }}">{{ t.status }}</span>
+        </td>
+        <td>
+          <span class="badge bg-{{ priority_colours.get(t.priority, 'secondary') }}">{{ t.priority }}</span>
+        </td>
+        <td class="small">{{ t.technician.full_name if t.technician else '—' }}</td>
+        <td class="text-muted small">{{ t.created_at.strftime('%d %b %Y') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link"
+         href="{{ url_for('tickets.index', page=pagination.prev_num, q=search, status=status_filter, priority=priority_filter, technician=technician_filter) }}">
+        &laquo; Prev
+      </a>
+    </li>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('tickets.index', page=p, q=search, status=status_filter, priority=priority_filter, technician=technician_filter) }}">
+            {{ p }}
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link"
+         href="{{ url_for('tickets.index', page=pagination.next_num, q=search, status=status_filter, priority=priority_filter, technician=technician_filter) }}">
+        Next &raquo;
+      </a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  {% if search or status_filter or priority_filter or technician_filter %}
+    <p>No tickets match your filters.</p>
+    <a href="{{ url_for('tickets.index') }}" class="btn btn-sm btn-outline-primary">Clear Filters</a>
+  {% else %}
+    <p>No tickets yet.</p>
+    <p class="small">Create a ticket from a <a href="{{ url_for('customers.index') }}">customer's profile</a>.</p>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

@@ -94,7 +94,14 @@
 {% endif %}
 
 <!-- Tickets Section -->
-<h5 class="mb-3">Tickets ({{ tickets|length }})</h5>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Tickets ({{ tickets|length }})</h5>
+  {% if devices %}
+  <a href="{{ url_for('tickets.create', customer_id=customer.id) }}" class="btn btn-sm btn-outline-success">
+    <i class="bi bi-clipboard-plus"></i> Create Ticket
+  </a>
+  {% endif %}
+</div>
 
 {% if tickets %}
 <div class="table-responsive">
@@ -112,8 +119,9 @@
       {% for t in tickets %}
       <tr>
         <td>
-          {# Link will work once Phase 3 is built #}
-          <span class="fw-semibold">{{ t.ticket_number }}</span>
+          <a href="{{ url_for('tickets.view', ticket_id=t.id) }}" class="text-decoration-none fw-semibold">
+            {{ t.ticket_number }}
+          </a>
         </td>
         <td>{{ t.device.display_name if t.device else '—' }}</td>
         <td class="small">{{ t.fault_description[:60] }}{% if t.fault_description|length > 60 %}…{% endif %}</td>

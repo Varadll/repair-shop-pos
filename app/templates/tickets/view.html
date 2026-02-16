@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.ticket_number }} — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="d-flex align-items-center">
+    <a href="{{ url_for('tickets.index') }}" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4 class="mb-0">
+        {{ ticket.ticket_number }}
+        <span class="badge bg-{{ status_colours.get(ticket.status, 'secondary') }} ms-2">{{ ticket.status }}</span>
+        <span class="badge bg-{{ priority_colours.get(ticket.priority, 'secondary') }} ms-1">{{ ticket.priority }}</span>
+      </h4>
+      <small class="text-muted">Created {{ ticket.created_at.strftime('%d %b %Y at %H:%M') }}</small>
+    </div>
+  </div>
+  <div>
+    <a href="{{ url_for('tickets.edit', ticket_id=ticket.id) }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Left Column: Ticket Info -->
+  <div class="col-lg-8">
+
+    <!-- Customer & Device Info -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h6 class="text-muted mb-2">Customer</h6>
+            <p class="mb-1">
+              <a href="{{ url_for('customers.view', customer_id=customer.id) }}" class="text-decoration-none fw-semibold">
+                {{ customer.full_name }}
+              </a>
+            </p>
+            <p class="mb-0 small text-muted">{{ customer.phone }}</p>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-muted mb-2">Device</h6>
+            <p class="mb-1">
+              <a href="{{ url_for('devices.view', device_id=device.id) }}" class="text-decoration-none fw-semibold">
+                {{ device.display_name }}
+              </a>
+            </p>
+            <p class="mb-0 small text-muted">
+              {{ device.device_type }}
+              {% if device.imei_serial %} · {{ device.imei_serial }}{% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fault Description -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Fault Description</h6>
+        <p class="mb-0" style="white-space: pre-wrap;">{{ ticket.fault_description }}</p>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-2"><i class="bi bi-chat-left-text"></i> Customer Notes</h6>
+            {% if ticket.customer_notes %}
+            <p class="mb-0 small" style="white-space: pre-wrap;">{{ ticket.customer_notes }}</p>
+            {% else %}
+            <p class="mb-0 small text-muted">No customer notes.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-2"><i class="bi bi-lock"></i> Internal Notes</h6>
+            {% if ticket.internal_notes %}
+            <p class="mb-0 small" style="white-space: pre-wrap;">{{ ticket.internal_notes }}</p>
+            {% else %}
+            <p class="mb-0 small text-muted">No internal notes.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parts Used (placeholder for Phase 4/5) -->
+    {% if parts_used %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Parts Used</h6>
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Part</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pu in parts_used %}
+            <tr>
+              <td>{{ pu.stock_item.name if pu.stock_item else '—' }}</td>
+              <td>{{ pu.quantity }}</td>
+              <td>€{{ '%.2f'|format(pu.price_charged) }}</td>
+              <td>€{{ '%.2f'|format(pu.line_total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Invoice Link (placeholder for Phase 5) -->
+    {% if ticket.invoice %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="text-muted mb-1">Invoice</h6>
+          <span class="fw-semibold">{{ ticket.invoice.invoice_number }}</span>
+          · €{{ '%.2f'|format(ticket.invoice.total) }}
+          {% if ticket.invoice.is_paid %}
+          <span class="badge bg-success ms-1">Paid</span>
+          {% else %}
+          <span class="badge bg-warning ms-1">Balance: €{{ '%.2f'|format(ticket.invoice.balance_due) }}</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('invoices.index') }}" class="btn btn-sm btn-outline-primary">View Invoice</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Progress Log / Audit Trail -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-3">Progress Log</h6>
+        {% if progress_logs %}
+        <div class="timeline">
+          {% for log in progress_logs %}
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3 text-center" style="width: 40px;">
+              {% if 'Status' in log.action %}
+              <i class="bi bi-arrow-repeat text-primary" style="font-size: 1.2rem;"></i>
+              {% elif 'Note' in log.action %}
+              <i class="bi bi-chat-dots text-info" style="font-size: 1.2rem;"></i>
+              {% elif 'Technician' in log.action %}
+              <i class="bi bi-person-gear text-warning" style="font-size: 1.2rem;"></i>
+              {% elif 'Created' in log.action %}
+              <i class="bi bi-plus-circle text-success" style="font-size: 1.2rem;"></i>
+              {% else %}
+              <i class="bi bi-pencil text-secondary" style="font-size: 1.2rem;"></i>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <strong class="small">{{ log.action }}</strong>
+                <small class="text-muted">{{ log.created_at.strftime('%d %b %Y %H:%M') }}</small>
+              </div>
+              {% if log.old_value and log.new_value %}
+              <small class="text-muted">{{ log.old_value }} → {{ log.new_value }}</small><br>
+              {% elif log.new_value %}
+              <small class="text-muted">{{ log.new_value }}</small><br>
+              {% endif %}
+              {% if log.note %}
+              <small class="d-block mt-1" style="white-space: pre-wrap;">{{ log.note }}</small>
+              {% endif %}
+              <small class="text-muted">by {{ log.user.full_name if log.user else '—' }}</small>
+            </div>
+          </div>
+          {% if not loop.last %}<hr class="my-0">{% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">No progress entries yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    {% if ticket.disclaimer_accepted %}
+    <div class="small text-muted mb-3">
+      <i class="bi bi-check-circle text-success"></i> Customer disclaimer accepted at intake.
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right Column: Actions -->
+  <div class="col-lg-4">
+
+    <!-- Quick Info -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Details</h6>
+        <p class="mb-1 small"><strong>Technician:</strong> {{ technician.full_name if technician else 'Unassigned' }}</p>
+        <p class="mb-1 small"><strong>Priority:</strong>
+          <span class="badge bg-{{ priority_colours.get(ticket.priority, 'secondary') }}">{{ ticket.priority }}</span>
+        </p>
+        <p class="mb-1 small"><strong>Due Date:</strong> {{ ticket.due_date.strftime('%d %b %Y') if ticket.due_date else '—' }}</p>
+        <p class="mb-0 small"><strong>Last Updated:</strong> {{ ticket.updated_at.strftime('%d %b %Y %H:%M') if ticket.updated_at else '—' }}</p>
+      </div>
+    </div>
+
+    <!-- Update Status -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Update Status</h6>
+        <form method="post" action="{{ url_for('tickets.update_status', ticket_id=ticket.id) }}">
+          <select name="status" class="form-select form-select-sm mb-2">
+            {% for s in status_choices %}
+            <option value="{{ s }}" {% if ticket.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <textarea name="note" class="form-control form-control-sm mb-2" rows="2"
+                    placeholder="Note about this status change (required)…" required></textarea>
+          <button type="submit" class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-arrow-repeat"></i> Update Status
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Assign Technician -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Assign Technician</h6>
+        <form method="post" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}">
+          <select name="technician_id" class="form-select form-select-sm mb-2">
+            <option value="">— Unassigned —</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}" {% if ticket.technician_id == t.id %}selected{% endif %}>
+              {{ t.full_name }}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+            <i class="bi bi-person-gear"></i> Assign
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Note -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Add Note</h6>
+        <form method="post" action="{{ url_for('tickets.add_note', ticket_id=ticket.id) }}">
+          <div class="mb-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="note_type" id="note_internal" value="internal" checked>
+              <label class="form-check-label small" for="note_internal">Internal</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="note_type" id="note_customer" value="customer">
+              <label class="form-check-label small" for="note_customer">Customer</label>
+            </div>
+          </div>
+          <textarea name="note" class="form-control form-control-sm mb-2" rows="3"
+                    placeholder="Write a note…" required></textarea>
+          <button type="submit" class="btn btn-sm btn-outline-info w-100">
+            <i class="bi bi-chat-dots"></i> Add Note
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
