@@ -1,0 +1,81 @@
+<!-- Reusable stock item form fields — included by add.html and edit.html -->
+
+<div class="row">
+  <div class="col-md-8">
+    <div class="mb-3">
+      <label for="name" class="form-label">Part Name <span class="text-danger">*</span></label>
+      <input type="text" name="name" id="name" class="form-control"
+             value="{{ form_data.get('name', '') }}" required
+             placeholder="e.g. iPhone 13 Screen, USB-C Charging Port">
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mb-3">
+      <label for="sku" class="form-label">SKU</label>
+      <input type="text" name="sku" id="sku" class="form-control"
+             value="{{ form_data.get('sku', '') }}"
+             placeholder="e.g. IP13-SCR-BLK">
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-4">
+    <div class="mb-3">
+      <label for="category" class="form-label">Category</label>
+      <select name="category" id="category" class="form-select">
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if form_data.get('category', 'General') == cat %}selected{% endif %}>
+          {{ cat }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="mb-3">
+      <label for="compatible_devices" class="form-label">Compatible Devices</label>
+      <input type="text" name="compatible_devices" id="compatible_devices" class="form-control"
+             value="{{ form_data.get('compatible_devices', '') }}"
+             placeholder="e.g. iPhone 13, iPhone 13 Pro, iPhone 14">
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-3">
+    <div class="mb-3">
+      <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+      <input type="number" name="quantity" id="quantity" class="form-control"
+             value="{{ form_data.get('quantity', '0') }}" min="0" required>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="mb-3">
+      <label for="low_stock_threshold" class="form-label">Low Stock Alert</label>
+      <input type="number" name="low_stock_threshold" id="low_stock_threshold" class="form-control"
+             value="{{ form_data.get('low_stock_threshold', '5') }}" min="0">
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="mb-3">
+      <label for="cost_price" class="form-label">Cost Price (€)</label>
+      <input type="number" name="cost_price" id="cost_price" class="form-control"
+             value="{{ form_data.get('cost_price', '0') }}" min="0" step="0.01">
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="mb-3">
+      <label for="sell_price" class="form-label">Sell Price (€)</label>
+      <input type="number" name="sell_price" id="sell_price" class="form-control"
+             value="{{ form_data.get('sell_price', '0') }}" min="0" step="0.01">
+    </div>
+  </div>
+</div>
+
+<div class="mb-3">
+  <label for="supplier" class="form-label">Supplier</label>
+  <input type="text" name="supplier" id="supplier" class="form-control"
+         value="{{ form_data.get('supplier', '') }}"
+         placeholder="e.g. MobileParts Ireland, Amazon">
+</div>

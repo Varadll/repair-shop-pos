@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    /* WeasyPrint PDF Invoice Styles */
+    @page {
+      size: A4;
+      margin: 20mm 15mm 25mm 15mm;
+      @bottom-center {
+        content: "Thank you for choosing " "{{ shop_name }}";
+        font-size: 8pt;
+        color: #888;
+      }
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      color: #333;
+      line-height: 1.4;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #212529;
+    }
+
+    .shop-info h1 {
+      font-size: 18pt;
+      color: #212529;
+      margin-bottom: 4px;
+    }
+
+    .shop-info p {
+      font-size: 9pt;
+      color: #666;
+      margin: 1px 0;
+    }
+
+    .invoice-info {
+      text-align: right;
+    }
+
+    .invoice-info h2 {
+      font-size: 20pt;
+      color: #212529;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .invoice-info p {
+      font-size: 9pt;
+      color: #666;
+      margin: 2px 0;
+    }
+
+    .invoice-info .inv-number {
+      font-size: 12pt;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* Customer & Device Details */
+    .details-grid {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .detail-box {
+      flex: 1;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+
+    .detail-box h3 {
+      font-size: 8pt;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .detail-box p {
+      margin: 2px 0;
+      font-size: 9.5pt;
+    }
+
+    .detail-box .name {
+      font-weight: bold;
+      font-size: 10pt;
+    }
+
+    /* Line Items Table */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .items-table thead th {
+      background: #212529;
+      color: #fff;
+      padding: 8px 10px;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .items-table thead th:first-child {
+      border-radius: 4px 0 0 0;
+    }
+
+    .items-table thead th:last-child {
+      border-radius: 0 4px 0 0;
+    }
+
+    .items-table tbody td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e9ecef;
+      font-size: 9.5pt;
+    }
+
+    .items-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    /* Totals */
+    .totals-section {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 25px;
+    }
+
+    .totals-box {
+      width: 250px;
+    }
+
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 9.5pt;
+    }
+
+    .totals-row.subtotal {
+      border-top: 1px solid #dee2e6;
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+
+    .totals-row.discount {
+      color: #dc3545;
+    }
+
+    .totals-row.total {
+      border-top: 2px solid #212529;
+      padding-top: 8px;
+      margin-top: 4px;
+      font-size: 13pt;
+      font-weight: bold;
+    }
+
+    .totals-row.paid {
+      color: #198754;
+    }
+
+    .totals-row.balance {
+      border-top: 1px solid #dee2e6;
+      padding-top: 8px;
+      margin-top: 4px;
+      font-weight: bold;
+      font-size: 11pt;
+    }
+
+    .totals-row.balance.has-balance {
+      color: #dc3545;
+    }
+
+    .totals-row.balance.fully-paid {
+      color: #198754;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 3px;
+      font-size: 9pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-paid {
+      background: #d1e7dd;
+      color: #0f5132;
+    }
+
+    .status-unpaid {
+      background: #fff3cd;
+      color: #664d03;
+    }
+
+    /* Payment Info */
+    .payment-info {
+      margin-bottom: 20px;
+      padding: 10px 12px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      font-size: 9pt;
+    }
+
+    /* Footer Notes */
+    .footer-notes {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #dee2e6;
+      font-size: 8pt;
+      color: #888;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="shop-info">
+      <h1>{{ shop_name }}</h1>
+      {% if shop_address %}<p>{{ shop_address }}</p>{% endif %}
+      {% if shop_phone %}<p>Tel: {{ shop_phone }}</p>{% endif %}
+      {% if shop_email %}<p>{{ shop_email }}</p>{% endif %}
+      {% if shop_vat %}<p>VAT: {{ shop_vat }}</p>{% endif %}
+    </div>
+    <div class="invoice-info">
+      <h2>INVOICE</h2>
+      <p class="inv-number">{{ invoice.invoice_number }}</p>
+      <p>Date: {{ invoice.created_at.strftime('%d %B %Y') }}</p>
+      <p>Ticket: {{ ticket.ticket_number }}</p>
+      <p>
+        {% if invoice.is_paid %}
+        <span class="status-badge status-paid">PAID</span>
+        {% else %}
+        <span class="status-badge status-unpaid">UNPAID</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Customer & Device Details -->
+  <div class="details-grid">
+    <div class="detail-box">
+      <h3>Bill To</h3>
+      <p class="name">{{ customer.full_name }}</p>
+      <p>{{ customer.phone }}</p>
+      {% if customer.email %}<p>{{ customer.email }}</p>{% endif %}
+      {% if customer.address %}<p>{{ customer.address }}</p>{% endif %}
+    </div>
+    <div class="detail-box">
+      <h3>Device</h3>
+      <p class="name">{{ device.display_name }}</p>
+      <p>Type: {{ device.device_type }}</p>
+      {% if device.imei_serial %}<p>IMEI/Serial: {{ device.imei_serial }}</p>{% endif %}
+      {% if device.colour %}<p>Colour: {{ device.colour }}</p>{% endif %}
+    </div>
+    <div class="detail-box">
+      <h3>Repair Details</h3>
+      <p class="name">{{ ticket.ticket_number }}</p>
+      <p>Status: {{ ticket.status }}</p>
+      <p>Fault: {{ ticket.fault_description[:80] }}{% if ticket.fault_description|length > 80 %}…{% endif %}</p>
+    </div>
+  </div>
+
+  <!-- Line Items -->
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Description</th>
+        <th class="text-center" style="width: 10%;">Qty</th>
+        <th class="text-right" style="width: 20%;">Unit Price</th>
+        <th class="text-right" style="width: 20%;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if invoice.labour_cost > 0 %}
+      <tr>
+        <td>Labour / Service Charge</td>
+        <td class="text-center">1</td>
+        <td class="text-right">&euro;{{ '%.2f'|format(invoice.labour_cost) }}</td>
+        <td class="text-right">&euro;{{ '%.2f'|format(invoice.labour_cost) }}</td>
+      </tr>
+      {% endif %}
+      {% for p in parts %}
+      <tr>
+        <td>{{ p.stock_item.name if p.stock_item else 'Part' }}{% if p.stock_item and p.stock_item.sku %} ({{ p.stock_item.sku }}){% endif %}</td>
+        <td class="text-center">{{ p.quantity }}</td>
+        <td class="text-right">&euro;{{ '%.2f'|format(p.price_charged) }}</td>
+        <td class="text-right">&euro;{{ '%.2f'|format(p.line_total) }}</td>
+      </tr>
+      {% endfor %}
+      {% if not parts and invoice.labour_cost == 0 %}
+      <tr>
+        <td colspan="4" class="text-center" style="color: #888; padding: 15px;">No items</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals-section">
+    <div class="totals-box">
+      <div class="totals-row">
+        <span>Parts:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.parts_cost) }}</span>
+      </div>
+      <div class="totals-row">
+        <span>Labour:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.labour_cost) }}</span>
+      </div>
+      <div class="totals-row subtotal">
+        <span>Subtotal:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.subtotal) }}</span>
+      </div>
+      {% if invoice.discount > 0 %}
+      <div class="totals-row discount">
+        <span>Discount:</span>
+        <span>-&euro;{{ '%.2f'|format(invoice.discount) }}</span>
+      </div>
+      {% endif %}
+      <div class="totals-row total">
+        <span>TOTAL:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.total) }}</span>
+      </div>
+      {% if invoice.deposit_paid > 0 %}
+      <div class="totals-row paid">
+        <span>Amount Paid:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.deposit_paid) }}</span>
+      </div>
+      {% endif %}
+      <div class="totals-row balance {% if invoice.balance_due > 0 %}has-balance{% else %}fully-paid{% endif %}">
+        <span>Balance Due:</span>
+        <span>&euro;{{ '%.2f'|format(invoice.balance_due) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Method -->
+  {% if invoice.payment_method %}
+  <div class="payment-info">
+    <strong>Payment Method:</strong> {{ invoice.payment_method }}
+    {% if invoice.is_paid %} &mdash; <strong>Paid in Full</strong>{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="footer-notes">
+    <p>{{ shop_name }} {% if shop_address %}&middot; {{ shop_address }}{% endif %} {% if shop_phone %}&middot; {{ shop_phone }}{% endif %}</p>
+    <p>Invoice generated on {{ invoice.created_at.strftime('%d %B %Y at %H:%M') }}</p>
+  </div>
+
+</body>
+</html>

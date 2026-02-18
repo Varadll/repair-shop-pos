@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ ticket.ticket_number }} — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h4 class="mb-0">Edit {{ ticket.ticket_number }}</h4>
+    <small class="text-muted">Customer: {{ customer.full_name }} · {{ ticket.device.display_name }}</small>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('tickets.edit', ticket_id=ticket.id) }}">
+
+      <!-- Fault Description -->
+      <div class="mb-3">
+        <label for="fault_description" class="form-label">Fault Description <span class="text-danger">*</span></label>
+        <textarea name="fault_description" id="fault_description" class="form-control" rows="3"
+                  required>{{ form_data.get('fault_description', '') }}</textarea>
+      </div>
+
+      <div class="row">
+        <!-- Priority -->
+        <div class="col-md-4 mb-3">
+          <label for="priority" class="form-label">Priority</label>
+          <select name="priority" id="priority" class="form-select">
+            {% for p in priority_choices %}
+            <option value="{{ p }}" {% if form_data.get('priority') == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Due Date -->
+        <div class="col-md-4 mb-3">
+          <label for="due_date" class="form-label">Due Date</label>
+          <input type="date" name="due_date" id="due_date" class="form-control"
+                 value="{{ form_data.get('due_date', '') }}">
+        </div>
+
+        <!-- Assign Technician -->
+        <div class="col-md-4 mb-3">
+          <label for="technician_id" class="form-label">Assign Technician</label>
+          <select name="technician_id" id="technician_id" class="form-select">
+            <option value="">— Unassigned —</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}"
+                    {% if form_data.get('technician_id') == t.id|string %}selected{% endif %}>
+              {{ t.full_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Customer Notes -->
+      <div class="mb-3">
+        <label for="customer_notes" class="form-label">Customer Notes</label>
+        <textarea name="customer_notes" id="customer_notes" class="form-control" rows="2">{{ form_data.get('customer_notes', '') }}</textarea>
+        <div class="form-text">These notes may appear on invoices and customer-facing documents.</div>
+      </div>
+
+      <!-- Internal Notes -->
+      <div class="mb-3">
+        <label for="internal_notes" class="form-label">Internal Notes</label>
+        <textarea name="internal_notes" id="internal_notes" class="form-control" rows="2">{{ form_data.get('internal_notes', '') }}</textarea>
+        <div class="form-text">Only visible to staff.</div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> Update Ticket
+        </button>
+        <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

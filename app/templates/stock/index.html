@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Stock — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-box-seam"></i> Stock / Parts</h4>
+  <a href="{{ url_for('stock.add') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Add Item
+  </a>
+</div>
+
+<!-- Search & Filters -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" name="q" class="form-control form-control-sm"
+               placeholder="Search name, SKU, device, supplier…" value="{{ search }}">
+      </div>
+      <div class="col-md-3">
+        <select name="category" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="low_stock" value="1"
+                 id="lowStockCheck" {% if low_stock_only == '1' %}checked{% endif %}>
+          <label class="form-check-label small" for="lowStockCheck">
+            Low Stock Only
+            {% if low_stock_count > 0 %}
+            <span class="badge bg-danger">{{ low_stock_count }}</span>
+            {% endif %}
+          </label>
+        </div>
+      </div>
+      <div class="col-md-3 text-end">
+        <button type="submit" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-search"></i> Search
+        </button>
+        <a href="{{ url_for('stock.index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Stock Table -->
+{% if items %}
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>SKU</th>
+          <th>Category</th>
+          <th class="text-center">Qty</th>
+          <th class="text-end">Cost</th>
+          <th class="text-end">Sell</th>
+          <th>Supplier</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="{% if item.is_low_stock %}table-warning{% endif %}"
+            style="cursor: pointer;"
+            onclick="window.location='{{ url_for('stock.view', item_id=item.id) }}'">
+          <td>
+            <span class="fw-semibold">{{ item.name }}</span>
+            {% if item.is_low_stock %}
+            <span class="badge bg-danger ms-1" title="Low stock">Low</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ item.sku or '—' }}</td>
+          <td><span class="badge bg-light text-dark">{{ item.category }}</span></td>
+          <td class="text-center">
+            <span class="{% if item.is_low_stock %}text-danger fw-bold{% endif %}">
+              {{ item.quantity }}
+            </span>
+          </td>
+          <td class="text-end text-muted">€{{ '%.2f'|format(item.cost_price) }}</td>
+          <td class="text-end">€{{ '%.2f'|format(item.sell_price) }}</td>
+          <td class="text-muted small">{{ item.supplier or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('stock.index', page=pagination.prev_num, q=search, category=category_filter, low_stock=low_stock_only) }}">‹</a>
+    </li>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('stock.index', page=p, q=search, category=category_filter, low_stock=low_stock_only) }}">{{ p }}</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('stock.index', page=pagination.next_num, q=search, category=category_filter, low_stock=low_stock_only) }}">›</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-box-seam" style="font-size: 2rem;"></i>
+  <p class="mt-2">No stock items found.
+    {% if search or category_filter or low_stock_only %}
+    <a href="{{ url_for('stock.index') }}">Clear filters</a> or
+    {% endif %}
+    <a href="{{ url_for('stock.add') }}">add your first item</a>.
+  </p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}New Ticket — {{ customer.full_name }} — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('customers.view', customer_id=customer.id) }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h4 class="mb-0">New Ticket</h4>
+    <small class="text-muted">Customer: <strong>{{ customer.full_name }}</strong> · {{ customer.phone }}</small>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('tickets.create', customer_id=customer.id) }}">
+
+      <!-- Device Selection -->
+      <div class="mb-3">
+        <label for="device_id" class="form-label">Device <span class="text-danger">*</span></label>
+        <select name="device_id" id="device_id" class="form-select" required>
+          <option value="">— Select device —</option>
+          {% for d in devices %}
+          <option value="{{ d.id }}"
+                  {% if form_data.get('device_id') == d.id|string %}selected{% endif %}>
+            {{ d.display_name }} ({{ d.device_type }}{% if d.imei_serial %} · {{ d.imei_serial }}{% endif %})
+          </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">
+          Device not listed?
+          <a href="{{ url_for('devices.add', customer_id=customer.id) }}">Add a new device</a> first.
+        </div>
+      </div>
+
+      <!-- Fault Description -->
+      <div class="mb-3">
+        <label for="fault_description" class="form-label">Fault Description <span class="text-danger">*</span></label>
+        <textarea name="fault_description" id="fault_description" class="form-control" rows="3"
+                  placeholder="Describe the issue the customer is reporting…"
+                  required>{{ form_data.get('fault_description', '') }}</textarea>
+      </div>
+
+      <div class="row">
+        <!-- Priority -->
+        <div class="col-md-4 mb-3">
+          <label for="priority" class="form-label">Priority</label>
+          <select name="priority" id="priority" class="form-select">
+            {% for p in priority_choices %}
+            <option value="{{ p }}" {% if form_data.get('priority', 'Normal') == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Due Date -->
+        <div class="col-md-4 mb-3">
+          <label for="due_date" class="form-label">Due Date</label>
+          <input type="date" name="due_date" id="due_date" class="form-control"
+                 value="{{ form_data.get('due_date', '') }}">
+        </div>
+
+        <!-- Assign Technician -->
+        <div class="col-md-4 mb-3">
+          <label for="technician_id" class="form-label">Assign Technician</label>
+          <select name="technician_id" id="technician_id" class="form-select">
+            <option value="">— Unassigned —</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}"
+                    {% if form_data.get('technician_id') == t.id|string %}selected{% endif %}>
+              {{ t.full_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Customer Notes -->
+      <div class="mb-3">
+        <label for="customer_notes" class="form-label">Customer Notes</label>
+        <textarea name="customer_notes" id="customer_notes" class="form-control" rows="2"
+                  placeholder="Notes visible to the customer (e.g. on receipts/invoices)…">{{ form_data.get('customer_notes', '') }}</textarea>
+        <div class="form-text">These notes may appear on invoices and customer-facing documents.</div>
+      </div>
+
+      <!-- Internal Notes -->
+      <div class="mb-3">
+        <label for="internal_notes" class="form-label">Internal Notes</label>
+        <textarea name="internal_notes" id="internal_notes" class="form-control" rows="2"
+                  placeholder="Private notes for technicians only…">{{ form_data.get('internal_notes', '') }}</textarea>
+        <div class="form-text">Only visible to staff. Never shown to customers.</div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="card bg-light border-warning mb-3">
+        <div class="card-body py-2">
+          <div class="form-check">
+            <input type="checkbox" name="disclaimer_accepted" id="disclaimer_accepted"
+                   class="form-check-input" value="1"
+                   {% if form_data.get('disclaimer_accepted') %}checked{% endif %} required>
+            <label for="disclaimer_accepted" class="form-check-label">
+              <strong>Customer Disclaimer:</strong> The customer acknowledges that the shop is not responsible for any
+              data loss, pre-existing damage, or issues unrelated to the reported fault. The customer confirms that
+              the device condition has been documented at intake.
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-clipboard-plus"></i> Create Ticket
+        </button>
+        <a href="{{ url_for('customers.view', customer_id=customer.id) }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

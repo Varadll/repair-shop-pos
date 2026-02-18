@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Add Stock Item — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('stock.index') }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0">Add Stock Item</h4>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {% include "stock/_form.html" %}
+      <hr>
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{{ url_for('stock.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-plus-lg"></i> Add Item
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

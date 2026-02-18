@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Dashboard</h4>
+<div class="row g-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-primary">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50">Open Tickets</div>
+            <div class="fs-3 fw-bold">&mdash;</div>
+          </div>
+          <i class="bi bi-clipboard-check fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-success">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50">Ready for Collection</div>
+            <div class="fs-3 fw-bold">&mdash;</div>
+          </div>
+          <i class="bi bi-check-circle fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-warning">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50">Low Stock Items</div>
+            <div class="fs-3 fw-bold">&mdash;</div>
+          </div>
+          <i class="bi bi-exclamation-triangle fs-1 text-dark-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-info">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-white-50">Today\'s Revenue</div>
+            <div class="fs-3 fw-bold">&mdash;</div>
+          </div>
+          <i class="bi bi-currency-euro fs-1 text-white-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4 text-muted">
+  <p>Dashboard stats will be wired up once tickets, invoices, and stock modules are built.</p>
+</div>
+{% endblock %}

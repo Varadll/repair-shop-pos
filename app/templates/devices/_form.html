@@ -1,0 +1,52 @@
+{# Reusable device form fields — included by add.html and edit.html #}
+<div class="row g-3">
+  <div class="col-md-6">
+    <label for="device_type" class="form-label">Device Type <span class="text-danger">*</span></label>
+    <select class="form-select" id="device_type" name="device_type" required>
+      <option value="" disabled {% if not form_data.get('device_type') %}selected{% endif %}>Select type…</option>
+      {% for dt in device_types %}
+      <option value="{{ dt }}" {% if form_data.get('device_type') == dt %}selected{% endif %}>{{ dt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-6">
+    <label for="brand" class="form-label">Brand <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" id="brand" name="brand"
+           value="{{ form_data.get('brand', '') }}" required maxlength="60"
+           placeholder="e.g. Apple, Samsung, Huawei">
+  </div>
+  <div class="col-md-6">
+    <label for="model" class="form-label">Model <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" id="model" name="model"
+           value="{{ form_data.get('model', '') }}" required maxlength="100"
+           placeholder="e.g. iPhone 15 Pro, Galaxy S24">
+  </div>
+  <div class="col-md-6">
+    <label for="colour" class="form-label">Colour</label>
+    <input type="text" class="form-control" id="colour" name="colour"
+           value="{{ form_data.get('colour', '') }}" maxlength="40"
+           placeholder="e.g. Black, Space Grey">
+  </div>
+  <div class="col-md-6">
+    <label for="imei_serial" class="form-label">IMEI / Serial Number</label>
+    <input type="text" class="form-control" id="imei_serial" name="imei_serial"
+           value="{{ form_data.get('imei_serial', '') }}" maxlength="60"
+           placeholder="e.g. 356938035643809">
+    <div class="form-text">Optional. Must be at least 8 characters if provided.</div>
+  </div>
+  <div class="col-md-6">
+    <label for="passcode" class="form-label">Passcode</label>
+    <input type="text" class="form-control" id="passcode" name="passcode"
+           value="{{ form_data.get('passcode', '') }}" maxlength="40"
+           placeholder="e.g. 1234 or pattern description">
+    <div class="form-text">For technician access during repair. Stored securely.</div>
+  </div>
+  <div class="col-12">
+    <label for="condition_notes" class="form-label">Condition Notes on Intake</label>
+    <textarea class="form-control" id="condition_notes" name="condition_notes" rows="4"
+              placeholder="Document the physical condition before repair: scratches, cracks, water damage, dents, missing parts…">{{ form_data.get('condition_notes', '') }}</textarea>
+    <div class="form-text text-warning-emphasis">
+      <i class="bi bi-shield-exclamation"></i> Important for legal protection — document all existing damage before starting work.
+    </div>
+  </div>
+</div>

@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Create Invoice — {{ ticket.ticket_number }} — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0">Create Invoice for {{ ticket.ticket_number }}</h4>
+</div>
+
+<div class="row">
+  <!-- Left: Form -->
+  <div class="col-lg-8">
+    <form method="post" id="invoiceForm">
+      <!-- Ticket & Customer Summary -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4">
+              <h6 class="text-muted mb-1">Customer</h6>
+              <p class="mb-0 fw-semibold">{{ customer.full_name }}</p>
+              <small class="text-muted">{{ customer.phone }}</small>
+            </div>
+            <div class="col-md-4">
+              <h6 class="text-muted mb-1">Device</h6>
+              <p class="mb-0 fw-semibold">{{ device.display_name }}</p>
+              <small class="text-muted">{{ device.device_type }}</small>
+            </div>
+            <div class="col-md-4">
+              <h6 class="text-muted mb-1">Ticket</h6>
+              <p class="mb-0 fw-semibold">{{ ticket.ticket_number }}</p>
+              <small class="text-muted">{{ ticket.status }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parts Used (read-only summary) -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-muted mb-0">Parts Used</h6>
+            <span class="badge bg-primary">&euro;{{ '%.2f'|format(parts_cost) }}</span>
+          </div>
+          {% if parts %}
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Part</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Unit Price</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in parts %}
+                <tr>
+                  <td>{{ p.stock_item.name if p.stock_item else '—' }}</td>
+                  <td class="text-center">{{ p.quantity }}</td>
+                  <td class="text-end">&euro;{{ '%.2f'|format(p.price_charged) }}</td>
+                  <td class="text-end">&euro;{{ '%.2f'|format(p.line_total) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0">No parts added to this ticket.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Invoice Fields -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-3">Invoice Details</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Labour Cost (&euro;)</label>
+              <input type="number" name="labour_cost" class="form-control" id="labourCost"
+                     step="0.01" min="0" value="{{ form_data.get('labour_cost', '0') }}"
+                     placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Discount (&euro;)</label>
+              <input type="number" name="discount" class="form-control" id="discountField"
+                     step="0.01" min="0" value="{{ form_data.get('discount', '0') }}"
+                     placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Deposit / Payment Received (&euro;)</label>
+              <input type="number" name="deposit_paid" class="form-control" id="depositField"
+                     step="0.01" min="0" value="{{ form_data.get('deposit_paid', '0') }}"
+                     placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Payment Method</label>
+              <select name="payment_method" class="form-select">
+                <option value="">— Select —</option>
+                {% for pm in payment_methods %}
+                <option value="{{ pm }}" {% if form_data.get('payment_method') == pm %}selected{% endif %}>
+                  {{ pm }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-receipt"></i> Create Invoice
+        </button>
+        <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Right: Live Preview -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm sticky-top" style="top: 1rem;">
+      <div class="card-body">
+        <h6 class="text-muted mb-3">Invoice Preview</h6>
+        <div class="d-flex justify-content-between small mb-1">
+          <span>Parts Cost:</span>
+          <span>&euro;{{ '%.2f'|format(parts_cost) }}</span>
+        </div>
+        <div class="d-flex justify-content-between small mb-1">
+          <span>Labour Cost:</span>
+          <span id="previewLabour">&euro;0.00</span>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between small mb-1">
+          <span>Subtotal:</span>
+          <span id="previewSubtotal">&euro;{{ '%.2f'|format(parts_cost) }}</span>
+        </div>
+        <div class="d-flex justify-content-between small mb-1 text-danger">
+          <span>Discount:</span>
+          <span id="previewDiscount">-&euro;0.00</span>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between fw-bold mb-1">
+          <span>Total:</span>
+          <span id="previewTotal">&euro;{{ '%.2f'|format(parts_cost) }}</span>
+        </div>
+        <div class="d-flex justify-content-between small mb-1 text-success">
+          <span>Deposit:</span>
+          <span id="previewDeposit">&euro;0.00</span>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between fw-bold" id="previewBalanceRow">
+          <span>Balance Due:</span>
+          <span id="previewBalance">&euro;{{ '%.2f'|format(parts_cost) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const partsCost = {{ parts_cost }};
+
+  function updatePreview() {
+    const labour = parseFloat(document.getElementById('labourCost').value) || 0;
+    const discount = parseFloat(document.getElementById('discountField').value) || 0;
+    const deposit = parseFloat(document.getElementById('depositField').value) || 0;
+
+    const subtotal = partsCost + labour;
+    const total = subtotal - discount;
+    const balance = total - deposit;
+
+    document.getElementById('previewLabour').textContent = '\u20ac' + labour.toFixed(2);
+    document.getElementById('previewSubtotal').textContent = '\u20ac' + subtotal.toFixed(2);
+    document.getElementById('previewDiscount').textContent = '-\u20ac' + discount.toFixed(2);
+    document.getElementById('previewTotal').textContent = '\u20ac' + total.toFixed(2);
+    document.getElementById('previewDeposit').textContent = '\u20ac' + deposit.toFixed(2);
+    document.getElementById('previewBalance').textContent = '\u20ac' + balance.toFixed(2);
+
+    const balanceRow = document.getElementById('previewBalanceRow');
+    if (balance <= 0) {
+      balanceRow.classList.add('text-success');
+      balanceRow.classList.remove('text-danger');
+    } else {
+      balanceRow.classList.add('text-danger');
+      balanceRow.classList.remove('text-success');
+    }
+  }
+
+  document.getElementById('labourCost').addEventListener('input', updatePreview);
+  document.getElementById('discountField').addEventListener('input', updatePreview);
+  document.getElementById('depositField').addEventListener('input', updatePreview);
+
+  // Init on load
+  updatePreview();
+</script>
+{% endblock %}

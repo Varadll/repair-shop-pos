@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Invoices — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Invoices</h4>
+  {% if unpaid_count > 0 %}
+  <span class="badge bg-warning text-dark">{{ unpaid_count }} Unpaid</span>
+  {% endif %}
+</div>
+
+<!-- Search & Filters -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" action="{{ url_for('invoices.index') }}" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <input type="text" name="q" class="form-control form-control-sm"
+               placeholder="Search invoice #, ticket #, customer name or phone…"
+               value="{{ search }}">
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">All Invoices ({{ total_count }})</option>
+          <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+          <option value="unpaid" {% if status_filter == 'unpaid' %}selected{% endif %}>Unpaid ({{ unpaid_count }})</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-sm btn-primary w-100">
+          <i class="bi bi-search"></i> Search
+        </button>
+      </div>
+      <div class="col-md-2">
+        <a href="{{ url_for('invoices.index') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Invoice Table -->
+{% if invoices %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Invoice #</th>
+        <th>Ticket</th>
+        <th>Customer</th>
+        <th class="text-end">Total</th>
+        <th class="text-end">Paid</th>
+        <th class="text-end">Balance</th>
+        <th class="text-center">Status</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr style="cursor:pointer;" onclick="window.location='{{ url_for('invoices.view', invoice_id=inv.id) }}'">
+        <td class="fw-semibold">
+          <a href="{{ url_for('invoices.view', invoice_id=inv.id) }}" class="text-decoration-none">
+            {{ inv.invoice_number }}
+          </a>
+        </td>
+        <td>
+          <a href="{{ url_for('tickets.view', ticket_id=inv.ticket.id) }}" class="text-decoration-none small"
+             onclick="event.stopPropagation();">
+            {{ inv.ticket.ticket_number }}
+          </a>
+        </td>
+        <td>
+          {{ inv.ticket.customer.full_name }}
+          <br><small class="text-muted">{{ inv.ticket.customer.phone }}</small>
+        </td>
+        <td class="text-end fw-semibold">&euro;{{ '%.2f'|format(inv.total) }}</td>
+        <td class="text-end">&euro;{{ '%.2f'|format(inv.deposit_paid) }}</td>
+        <td class="text-end">
+          {% if inv.balance_due > 0 %}
+          <span class="text-danger fw-semibold">&euro;{{ '%.2f'|format(inv.balance_due) }}</span>
+          {% else %}
+          &euro;0.00
+          {% endif %}
+        </td>
+        <td class="text-center">
+          {% if inv.is_paid %}
+          <span class="badge bg-success">Paid</span>
+          {% else %}
+          <span class="badge bg-warning text-dark">Unpaid</span>
+          {% endif %}
+        </td>
+        <td class="small text-muted">{{ inv.created_at.strftime('%d %b %Y') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav>
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if pagination.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('invoices.index', page=pagination.prev_num, q=search, status=status_filter) }}">
+        &laquo; Prev
+      </a>
+    </li>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('invoices.index', page=p, q=search, status=status_filter) }}">{{ p }}</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('invoices.index', page=pagination.next_num, q=search, status=status_filter) }}">
+        Next &raquo;
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-receipt" style="font-size: 3rem;"></i>
+  <p class="mt-2">No invoices found{% if search %} matching "{{ search }}"{% endif %}.</p>
+  <p class="small">Invoices are created from the ticket detail page.</p>
+</div>
+{% endif %}
+{% endblock %}
