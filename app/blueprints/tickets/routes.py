@@ -5,6 +5,10 @@ from app.blueprints.tickets import bp
 from app.extensions import db
 from app.models import (
     Ticket, Customer, Device, User, TicketProgressLog,
+<<<<<<< HEAD
+=======
+    StockItem, TicketPartUsed,
+>>>>>>> 51e3823 (commit new changes)
 )
 
 
@@ -270,6 +274,12 @@ def view(ticket_id):
     progress_logs = ticket.progress_logs.order_by(TicketProgressLog.created_at.desc()).all()
     parts_used = ticket.parts_used.all()
 
+<<<<<<< HEAD
+=======
+    # Stock items for the "Add Part" dropdown
+    stock_items = StockItem.query.filter(StockItem.quantity > 0).order_by(StockItem.name).all()
+
+>>>>>>> 51e3823 (commit new changes)
     return render_template(
         "tickets/view.html",
         ticket=ticket,
@@ -278,6 +288,10 @@ def view(ticket_id):
         technician=technician,
         progress_logs=progress_logs,
         parts_used=parts_used,
+<<<<<<< HEAD
+=======
+        stock_items=stock_items,
+>>>>>>> 51e3823 (commit new changes)
         status_choices=STATUS_CHOICES,
         status_colours=STATUS_COLOURS,
         priority_colours=PRIORITY_COLOURS,
@@ -472,3 +486,131 @@ def assign(ticket_id):
     db.session.commit()
     flash(f"Ticket reassigned to {new_tech}.", "success")
     return redirect(url_for("tickets.view", ticket_id=ticket.id))
+<<<<<<< HEAD
+=======
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Parts Management on Tickets
+# ---------------------------------------------------------------------------
+
+@bp.route("/<int:ticket_id>/add-part", methods=["POST"])
+@login_required
+def add_part(ticket_id):
+    """Add a stock part to this ticket. Auto-deducts from stock quantity."""
+    ticket = Ticket.query.get_or_404(ticket_id)
+
+    stock_item_id_str = request.form.get("stock_item_id", "").strip()
+    quantity_str = request.form.get("part_quantity", "1").strip()
+    price_str = request.form.get("part_price", "").strip()
+
+    # Validate stock item
+    if not stock_item_id_str:
+        flash("Please select a part.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    try:
+        stock_item_id = int(stock_item_id_str)
+    except ValueError:
+        flash("Invalid part selection.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    stock_item = StockItem.query.get(stock_item_id)
+    if not stock_item:
+        flash("Selected part does not exist.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    # Validate quantity
+    try:
+        quantity = int(quantity_str)
+        if quantity < 1:
+            flash("Quantity must be at least 1.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket.id))
+    except ValueError:
+        flash("Quantity must be a whole number.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    # Check stock availability
+    if stock_item.quantity < quantity:
+        flash(
+            f"Insufficient stock for '{stock_item.name}'. "
+            f"Available: {stock_item.quantity}, Requested: {quantity}.",
+            "danger",
+        )
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    # Validate price (default to sell price if empty)
+    if not price_str:
+        price_charged = stock_item.sell_price
+    else:
+        try:
+            price_charged = round(float(price_str), 2)
+            if price_charged < 0:
+                flash("Price cannot be negative.", "danger")
+                return redirect(url_for("tickets.view", ticket_id=ticket.id))
+        except ValueError:
+            flash("Price must be a valid number.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    # Create the TicketPartUsed record
+    part_used = TicketPartUsed(
+        ticket_id=ticket.id,
+        stock_item_id=stock_item.id,
+        quantity=quantity,
+        price_charged=price_charged,
+    )
+    db.session.add(part_used)
+
+    # Deduct from stock
+    stock_item.quantity -= quantity
+
+    # Log to audit trail
+    _log_progress(
+        ticket,
+        action="Part Added",
+        new_value=f"{stock_item.name} x{quantity} @ €{price_charged:.2f}",
+        note=f"Stock deducted: {stock_item.quantity + quantity} → {stock_item.quantity}",
+    )
+
+    db.session.commit()
+    flash(
+        f"Added {stock_item.name} x{quantity} @ €{price_charged:.2f} to ticket.",
+        "success",
+    )
+    return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+
+@bp.route("/<int:ticket_id>/remove-part/<int:part_id>", methods=["POST"])
+@login_required
+def remove_part(ticket_id, part_id):
+    """Remove a part from ticket and restore stock quantity."""
+    ticket = Ticket.query.get_or_404(ticket_id)
+    part_used = TicketPartUsed.query.get_or_404(part_id)
+
+    # Security: ensure this part belongs to this ticket
+    if part_used.ticket_id != ticket.id:
+        flash("Invalid operation.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket.id))
+
+    stock_item = part_used.stock_item
+    restored_qty = part_used.quantity
+    part_name = stock_item.name if stock_item else "Unknown Part"
+
+    # Restore stock quantity
+    if stock_item:
+        stock_item.quantity += restored_qty
+
+    # Log to audit trail
+    _log_progress(
+        ticket,
+        action="Part Removed",
+        old_value=f"{part_name} x{restored_qty}",
+        note=f"Stock restored: {stock_item.quantity - restored_qty} → {stock_item.quantity}" if stock_item else "",
+    )
+
+    db.session.delete(part_used)
+    db.session.commit()
+
+    flash(f"Removed {part_name} x{restored_qty} from ticket. Stock restored.", "success")
+    return redirect(url_for("tickets.view", ticket_id=ticket.id))
+>>>>>>> 51e3823 (commit new changes)

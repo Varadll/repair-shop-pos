@@ -92,6 +92,7 @@
       </div>
     </div>
 
+<<<<<<< HEAD
     <!-- Parts Used (placeholder for Phase 4/5) -->
     {% if parts_used %}
     <div class="card border-0 shadow-sm mb-3">
@@ -139,6 +140,142 @@
       </div>
     </div>
     {% endif %}
+=======
+    <!-- Parts Used (FULLY FUNCTIONAL — Phase 4) -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="text-muted mb-0"><i class="bi bi-box-seam"></i> Parts Used</h6>
+          {% set parts_total = parts_used | sum(attribute='line_total') if parts_used else 0 %}
+          {% if parts_total > 0 %}
+          <span class="badge bg-primary">Total: €{{ '%.2f'|format(parts_total) }}</span>
+          {% endif %}
+        </div>
+
+        {% if parts_used %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-3">
+            <thead class="table-light">
+              <tr>
+                <th>Part</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Unit Price</th>
+                <th class="text-end">Total</th>
+                <th class="text-center" style="width: 60px;">Remove</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pu in parts_used %}
+              <tr>
+                <td>
+                  {% if pu.stock_item %}
+                  <a href="{{ url_for('stock.view', item_id=pu.stock_item.id) }}" class="text-decoration-none">
+                    {{ pu.stock_item.name }}
+                  </a>
+                  <span class="text-muted small">{{ pu.stock_item.category }}</span>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">{{ pu.quantity }}</td>
+                <td class="text-end">€{{ '%.2f'|format(pu.price_charged) }}</td>
+                <td class="text-end fw-semibold">€{{ '%.2f'|format(pu.line_total) }}</td>
+                <td class="text-center">
+                  <form method="post"
+                        action="{{ url_for('tickets.remove_part', ticket_id=ticket.id, part_id=pu.id) }}"
+                        onsubmit="return confirm('Remove this part and restore stock?');"
+                        class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove part">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-3">No parts added yet.</p>
+        {% endif %}
+
+        <!-- Add Part Form -->
+        <div class="border-top pt-3">
+          <form method="post" action="{{ url_for('tickets.add_part', ticket_id=ticket.id) }}"
+                class="row g-2 align-items-end" id="addPartForm">
+            <div class="col-md-4">
+              <label class="form-label small">Part</label>
+              <select name="stock_item_id" class="form-select form-select-sm" id="partSelect" required>
+                <option value="">— Select Part —</option>
+                {% for si in stock_items %}
+                <option value="{{ si.id }}"
+                        data-price="{{ si.sell_price }}"
+                        data-qty="{{ si.quantity }}">
+                  {{ si.name }}
+                  {% if si.sku %}({{ si.sku }}){% endif %}
+                  — €{{ '%.2f'|format(si.sell_price) }}
+                  [{{ si.quantity }} in stock]
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small">Qty</label>
+              <input type="number" name="part_quantity" class="form-control form-control-sm"
+                     value="1" min="1" id="partQty">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Price (€)</label>
+              <input type="number" name="part_price" class="form-control form-control-sm"
+                     step="0.01" min="0" id="partPrice"
+                     placeholder="Auto from sell price">
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-sm btn-primary w-100">
+                <i class="bi bi-plus-lg"></i> Add Part
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoice Section -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        {% if ticket.invoice %}
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="text-muted mb-1"><i class="bi bi-receipt"></i> Invoice</h6>
+            <span class="fw-semibold">{{ ticket.invoice.invoice_number }}</span>
+            &middot; &euro;{{ '%.2f'|format(ticket.invoice.total) }}
+            {% if ticket.invoice.is_paid %}
+            <span class="badge bg-success ms-1">Paid</span>
+            {% else %}
+            <span class="badge bg-warning text-dark ms-1">Balance: &euro;{{ '%.2f'|format(ticket.invoice.balance_due) }}</span>
+            {% endif %}
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('invoices.download_pdf', invoice_id=ticket.invoice.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" title="Download PDF">
+              <i class="bi bi-file-earmark-pdf"></i>
+            </a>
+            <a href="{{ url_for('invoices.view', invoice_id=ticket.invoice.id) }}" class="btn btn-sm btn-outline-primary">View Invoice</a>
+          </div>
+        </div>
+        {% else %}
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="text-muted mb-1"><i class="bi bi-receipt"></i> Invoice</h6>
+            <span class="text-muted small">No invoice created yet.</span>
+          </div>
+          <a href="{{ url_for('invoices.create', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Create Invoice
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+>>>>>>> 51e3823 (commit new changes)
 
     <!-- Progress Log / Audit Trail -->
     <div class="card border-0 shadow-sm mb-3">
@@ -155,8 +292,17 @@
               <i class="bi bi-chat-dots text-info" style="font-size: 1.2rem;"></i>
               {% elif 'Technician' in log.action %}
               <i class="bi bi-person-gear text-warning" style="font-size: 1.2rem;"></i>
+<<<<<<< HEAD
               {% elif 'Created' in log.action %}
               <i class="bi bi-plus-circle text-success" style="font-size: 1.2rem;"></i>
+=======
+              {% elif 'Created' in log.action and 'Invoice' not in log.action %}
+              <i class="bi bi-plus-circle text-success" style="font-size: 1.2rem;"></i>
+              {% elif 'Invoice' in log.action or 'Payment' in log.action %}
+              <i class="bi bi-receipt text-{{ 'success' if 'Paid' in log.action or 'Payment' in log.action else 'primary' }}" style="font-size: 1.2rem;"></i>
+              {% elif 'Part' in log.action %}
+              <i class="bi bi-box-seam text-{{ 'success' if 'Added' in log.action else 'danger' }}" style="font-size: 1.2rem;"></i>
+>>>>>>> 51e3823 (commit new changes)
               {% else %}
               <i class="bi bi-pencil text-secondary" style="font-size: 1.2rem;"></i>
               {% endif %}
@@ -170,6 +316,11 @@
               <small class="text-muted">{{ log.old_value }} → {{ log.new_value }}</small><br>
               {% elif log.new_value %}
               <small class="text-muted">{{ log.new_value }}</small><br>
+<<<<<<< HEAD
+=======
+              {% elif log.old_value %}
+              <small class="text-muted">{{ log.old_value }}</small><br>
+>>>>>>> 51e3823 (commit new changes)
               {% endif %}
               {% if log.note %}
               <small class="d-block mt-1" style="white-space: pre-wrap;">{{ log.note }}</small>
@@ -277,3 +428,23 @@
   </div>
 </div>
 {% endblock %}
+<<<<<<< HEAD
+=======
+
+{% block extra_js %}
+<script>
+  // Auto-fill price when a part is selected from the dropdown
+  document.getElementById('partSelect').addEventListener('change', function () {
+    const selected = this.options[this.selectedIndex];
+    const priceField = document.getElementById('partPrice');
+    if (selected.value) {
+      priceField.value = selected.getAttribute('data-price') || '';
+      priceField.placeholder = '€' + (selected.getAttribute('data-price') || '0.00');
+    } else {
+      priceField.value = '';
+      priceField.placeholder = 'Auto from sell price';
+    }
+  });
+</script>
+{% endblock %}
+>>>>>>> 51e3823 (commit new changes)

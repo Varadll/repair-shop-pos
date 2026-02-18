@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}New Sale — POS — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('pos.index') }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0"><i class="bi bi-cart-plus"></i> New POS Sale</h4>
+</div>
+
+<form method="post" id="posForm">
+  <div class="row">
+
+    <!-- LEFT: Item Search + Cart -->
+    <div class="col-lg-8">
+
+      <!-- Stock Item Search -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-2"><i class="bi bi-search"></i> Add Items</h6>
+          <div class="position-relative">
+            <input type="text" id="itemSearch" class="form-control form-control-sm"
+                   placeholder="Search stock by name, SKU, or compatible device..." autocomplete="off">
+            <div id="searchResults" class="list-group position-absolute w-100 shadow"
+                 style="z-index:1050; max-height:250px; overflow-y:auto; display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cart Table -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">
+            <i class="bi bi-bag"></i> Cart
+            <span id="cartCount" class="badge bg-primary ms-1">0</span>
+          </h6>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" id="cartTable">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th style="width:90px;" class="text-center">Qty</th>
+                  <th style="width:110px;" class="text-end">Price</th>
+                  <th style="width:100px;" class="text-end">Total</th>
+                  <th style="width:50px;"></th>
+                </tr>
+              </thead>
+              <tbody id="cartBody">
+                <tr id="emptyCartRow">
+                  <td colspan="5" class="text-center text-muted py-3">
+                    Search and add items above
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="table-light">
+                  <td colspan="3" class="text-end fw-bold">Total:</td>
+                  <td class="text-end fw-bold fs-5 text-primary" id="cartTotal">€0.00</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Payment + Customer + Notes -->
+    <div class="col-lg-4">
+
+      <!-- Payment Method -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-2"><i class="bi bi-credit-card"></i> Payment</h6>
+          <div class="d-flex flex-wrap gap-2">
+            {% for method in payment_methods %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payment_method"
+                     id="pay_{{ method }}" value="{{ method }}"
+                     {% if method == 'Cash' %}checked{% endif %}>
+              <label class="form-check-label" for="pay_{{ method }}">{{ method }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional Customer -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-2"><i class="bi bi-person"></i> Customer (optional)</h6>
+          <div class="position-relative">
+            <input type="text" id="customerSearch" class="form-control form-control-sm"
+                   placeholder="Search customer name or phone..." autocomplete="off">
+            <div id="customerResults" class="list-group position-absolute w-100 shadow"
+                 style="z-index:1050; max-height:200px; overflow-y:auto; display:none;"></div>
+          </div>
+          <input type="hidden" name="customer_id" id="customerId" value="">
+          <div id="selectedCustomer" class="mt-2" style="display:none;">
+            <span class="badge bg-info" id="customerBadge"></span>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="clearCustomer()">
+              <i class="bi bi-x-circle"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="text-muted mb-2"><i class="bi bi-sticky"></i> Notes</h6>
+          <textarea name="notes" class="form-control form-control-sm" rows="2"
+                    placeholder="Optional sale notes..."></textarea>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn btn-success w-100 btn-lg" id="submitBtn" disabled>
+        <i class="bi bi-check-circle"></i> Complete Sale
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Hidden fields container for cart items (populated by JS) -->
+  <div id="hiddenFields"></div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  // ---------- Cart State ----------
+  let cart = [];  // [{id, name, sku, quantity, price, maxQty}]
+
+  function updateCartUI() {
+    const tbody = document.getElementById('cartBody');
+    const countBadge = document.getElementById('cartCount');
+    const totalEl = document.getElementById('cartTotal');
+    const hiddenFields = document.getElementById('hiddenFields');
+    const submitBtn = document.getElementById('submitBtn');
+    const emptyRow = document.getElementById('emptyCartRow');
+
+    // Clear
+    tbody.innerHTML = '';
+    hiddenFields.innerHTML = '';
+
+    if (cart.length === 0) {
+      tbody.innerHTML = '<tr id="emptyCartRow"><td colspan="5" class="text-center text-muted py-3">Search and add items above</td></tr>';
+      countBadge.textContent = '0';
+      totalEl.textContent = '€0.00';
+      submitBtn.disabled = true;
+      return;
+    }
+
+    let grandTotal = 0;
+    cart.forEach(function(item, idx) {
+      const lineTotal = item.quantity * item.price;
+      grandTotal += lineTotal;
+
+      // Table row
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' +
+          '<div class="fw-semibold small">' + escapeHtml(item.name) + '</div>' +
+          (item.sku ? '<div class="text-muted" style="font-size:.75rem;">SKU: ' + escapeHtml(item.sku) + '</div>' : '') +
+        '</td>' +
+        '<td class="text-center">' +
+          '<input type="number" class="form-control form-control-sm text-center" ' +
+                 'value="' + item.quantity + '" min="1" max="' + item.maxQty + '" ' +
+                 'onchange="updateQty(' + idx + ', this.value)" style="width:70px; margin:0 auto;">' +
+        '</td>' +
+        '<td class="text-end">' +
+          '<input type="number" class="form-control form-control-sm text-end" ' +
+                 'value="' + item.price.toFixed(2) + '" min="0" step="0.01" ' +
+                 'onchange="updatePrice(' + idx + ', this.value)" style="width:95px; margin-left:auto;">' +
+        '</td>' +
+        '<td class="text-end fw-semibold">€' + lineTotal.toFixed(2) + '</td>' +
+        '<td class="text-center">' +
+          '<button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeItem(' + idx + ')">' +
+            '<i class="bi bi-trash"></i>' +
+          '</button>' +
+        '</td>';
+      tbody.appendChild(tr);
+
+      // Hidden fields for form submission
+      hiddenFields.innerHTML +=
+        '<input type="hidden" name="item_id[]" value="' + item.id + '">' +
+        '<input type="hidden" name="item_qty[]" value="' + item.quantity + '">' +
+        '<input type="hidden" name="item_price[]" value="' + item.price.toFixed(2) + '">';
+    });
+
+    countBadge.textContent = cart.length;
+    totalEl.textContent = '€' + grandTotal.toFixed(2);
+    submitBtn.disabled = false;
+  }
+
+  // ---------- Cart Actions (global scope for onclick) ----------
+  window.updateQty = function(idx, val) {
+    let qty = parseInt(val) || 1;
+    if (qty < 1) qty = 1;
+    if (qty > cart[idx].maxQty) {
+      qty = cart[idx].maxQty;
+      alert('Only ' + cart[idx].maxQty + ' available in stock.');
+    }
+    cart[idx].quantity = qty;
+    updateCartUI();
+  };
+
+  window.updatePrice = function(idx, val) {
+    let price = parseFloat(val) || 0;
+    if (price < 0) price = 0;
+    cart[idx].price = Math.round(price * 100) / 100;
+    updateCartUI();
+  };
+
+  window.removeItem = function(idx) {
+    cart.splice(idx, 1);
+    updateCartUI();
+  };
+
+  window.clearCustomer = function() {
+    document.getElementById('customerId').value = '';
+    document.getElementById('customerSearch').value = '';
+    document.getElementById('selectedCustomer').style.display = 'none';
+  };
+
+  function addToCart(item) {
+    // Check if already in cart
+    const existing = cart.find(c => c.id === item.id);
+    if (existing) {
+      if (existing.quantity < existing.maxQty) {
+        existing.quantity++;
+      } else {
+        alert('No more stock available for ' + item.name);
+      }
+    } else {
+      if (item.quantity <= 0) {
+        alert(item.name + ' is out of stock.');
+        return;
+      }
+      cart.push({
+        id: item.id,
+        name: item.name,
+        sku: item.sku || '',
+        quantity: 1,
+        price: item.sell_price,
+        maxQty: item.quantity,
+      });
+    }
+    updateCartUI();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ---------- Stock Item Search ----------
+  let searchTimeout = null;
+  const itemSearch = document.getElementById('itemSearch');
+  const searchResults = document.getElementById('searchResults');
+
+  itemSearch.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const q = this.value.trim();
+    if (q.length < 1) {
+      searchResults.style.display = 'none';
+      return;
+    }
+    searchTimeout = setTimeout(function() {
+      fetch('/stock/api/search?q=' + encodeURIComponent(q) + '&limit=8')
+        .then(r => r.json())
+        .then(function(data) {
+          searchResults.innerHTML = '';
+          if (data.length === 0) {
+            searchResults.innerHTML = '<div class="list-group-item text-muted small">No items found</div>';
+            searchResults.style.display = 'block';
+            return;
+          }
+          data.forEach(function(item) {
+            const el = document.createElement('a');
+            el.href = '#';
+            el.className = 'list-group-item list-group-item-action py-2';
+            el.innerHTML =
+              '<div class="d-flex justify-content-between align-items-center">' +
+                '<div>' +
+                  '<div class="fw-semibold small">' + escapeHtml(item.name) + '</div>' +
+                  '<div class="text-muted" style="font-size:.75rem;">' +
+                    (item.sku ? 'SKU: ' + escapeHtml(item.sku) + ' · ' : '') +
+                    item.category +
+                  '</div>' +
+                '</div>' +
+                '<div class="text-end">' +
+                  '<div class="fw-bold small">€' + item.sell_price.toFixed(2) + '</div>' +
+                  '<div class="' + (item.quantity <= 0 ? 'text-danger' : (item.is_low_stock ? 'text-warning' : 'text-muted')) +
+                    '" style="font-size:.75rem;">Stock: ' + item.quantity + '</div>' +
+                '</div>' +
+              '</div>';
+            el.addEventListener('click', function(e) {
+              e.preventDefault();
+              addToCart(item);
+              itemSearch.value = '';
+              searchResults.style.display = 'none';
+              itemSearch.focus();
+            });
+            searchResults.appendChild(el);
+          });
+          searchResults.style.display = 'block';
+        });
+    }, 250);
+  });
+
+  // Close search results when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!itemSearch.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.style.display = 'none';
+    }
+  });
+
+  // ---------- Customer Search ----------
+  let custTimeout = null;
+  const customerSearch = document.getElementById('customerSearch');
+  const customerResults = document.getElementById('customerResults');
+
+  customerSearch.addEventListener('input', function() {
+    clearTimeout(custTimeout);
+    const q = this.value.trim();
+    if (q.length < 1) {
+      customerResults.style.display = 'none';
+      return;
+    }
+    custTimeout = setTimeout(function() {
+      fetch('/pos/api/customer-search?q=' + encodeURIComponent(q) + '&limit=5')
+        .then(r => r.json())
+        .then(function(data) {
+          customerResults.innerHTML = '';
+          if (data.length === 0) {
+            customerResults.innerHTML = '<div class="list-group-item text-muted small">No customers found</div>';
+            customerResults.style.display = 'block';
+            return;
+          }
+          data.forEach(function(cust) {
+            const el = document.createElement('a');
+            el.href = '#';
+            el.className = 'list-group-item list-group-item-action py-2 small';
+            el.innerHTML = '<strong>' + escapeHtml(cust.name) + '</strong> <span class="text-muted">— ' + escapeHtml(cust.phone) + '</span>';
+            el.addEventListener('click', function(e) {
+              e.preventDefault();
+              document.getElementById('customerId').value = cust.id;
+              document.getElementById('customerBadge').textContent = cust.name + ' (' + cust.phone + ')';
+              document.getElementById('selectedCustomer').style.display = 'block';
+              customerSearch.value = '';
+              customerResults.style.display = 'none';
+            });
+            customerResults.appendChild(el);
+          });
+          customerResults.style.display = 'block';
+        });
+    }, 250);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!customerSearch.contains(e.target) && !customerResults.contains(e.target)) {
+      customerResults.style.display = 'none';
+    }
+  });
+
+  // ---------- Form Submit Confirmation ----------
+  document.getElementById('posForm').addEventListener('submit', function(e) {
+    if (cart.length === 0) {
+      e.preventDefault();
+      alert('Please add at least one item.');
+    }
+  });
+
+  // Init
+  updateCartUI();
+})();
+</script>
+{% endblock %}

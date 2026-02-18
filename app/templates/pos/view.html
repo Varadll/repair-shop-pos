@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ sale.sale_number }} — POS Sale — {{ shop_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="d-flex align-items-center">
+    <a href="{{ url_for('pos.index') }}" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4 class="mb-0">{{ sale.sale_number }}</h4>
+      <small class="text-muted">{{ sale.created_at.strftime('%d %B %Y at %H:%M') }}</small>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('pos.receipt_pdf', sale_id=sale.id) }}" class="btn btn-outline-primary btn-sm" target="_blank">
+      <i class="bi bi-printer"></i> Receipt
+    </a>
+    {% if current_user.is_admin %}
+    <form method="post" action="{{ url_for('pos.delete', sale_id=sale.id) }}"
+          onsubmit="return confirm('Delete this sale and restore stock? This cannot be undone.');"
+          class="d-inline">
+      <button type="submit" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-trash"></i> Delete
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row">
+  <!-- Left: Sale Details -->
+  <div class="col-lg-8">
+
+    <!-- Items Table -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2"><i class="bi bi-bag"></i> Items Sold</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Item</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Unit Price</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td>
+                  {% if item.stock_item %}
+                  <a href="{{ url_for('stock.view', item_id=item.stock_item.id) }}" class="text-decoration-none">
+                    {{ item.stock_item.name }}
+                  </a>
+                  {% if item.stock_item.sku %}
+                  <span class="text-muted" style="font-size:.75rem;"> · {{ item.stock_item.sku }}</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted">Deleted item</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-end">€{{ '%.2f'|format(item.price_charged) }}</td>
+                <td class="text-end fw-semibold">€{{ '%.2f'|format(item.line_total) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-light">
+                <td colspan="3" class="text-end fw-bold">Total:</td>
+                <td class="text-end fw-bold fs-5 text-primary">€{{ '%.2f'|format(sale.total) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Sale Info -->
+  <div class="col-lg-4">
+
+    <!-- Payment Info -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2"><i class="bi bi-credit-card"></i> Payment</h6>
+        <p class="mb-1">
+          <span class="badge {% if sale.payment_method == 'Cash' %}bg-success{% elif sale.payment_method == 'Card' %}bg-primary{% else %}bg-secondary{% endif %} fs-6">
+            {{ sale.payment_method }}
+          </span>
+        </p>
+        <p class="mb-0 fs-4 fw-bold text-primary">€{{ '%.2f'|format(sale.total) }}</p>
+      </div>
+    </div>
+
+    <!-- Served By -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2"><i class="bi bi-person-badge"></i> Served By</h6>
+        <p class="mb-0">{{ sale.served_by_user.full_name if sale.served_by_user else '—' }}</p>
+      </div>
+    </div>
+
+    <!-- Customer -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2"><i class="bi bi-person"></i> Customer</h6>
+        {% if sale.customer %}
+        <p class="mb-0">
+          <a href="{{ url_for('customers.view', customer_id=sale.customer.id) }}" class="text-decoration-none">
+            {{ sale.customer.full_name }}
+          </a>
+          <br><span class="text-muted small">{{ sale.customer.phone }}</span>
+        </p>
+        {% else %}
+        <p class="mb-0 text-muted">Walk-in customer</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Notes -->
+    {% if sale.notes %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2"><i class="bi bi-sticky"></i> Notes</h6>
+        <p class="mb-0 small">{{ sale.notes }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

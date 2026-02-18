@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 5mm;
+    }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 11px;
+      color: #333;
+      line-height: 1.4;
+      margin: 0;
+      padding: 0;
+    }
+    .receipt {
+      max-width: 70mm;
+      margin: 0 auto;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-muted { color: #777; }
+    .fw-bold { font-weight: bold; }
+    .divider {
+      border-top: 1px dashed #aaa;
+      margin: 6px 0;
+    }
+    .shop-name {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .shop-details {
+      font-size: 9px;
+      color: #666;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 2px 0;
+      vertical-align: top;
+    }
+    th {
+      font-size: 9px;
+      text-transform: uppercase;
+      color: #666;
+      border-bottom: 1px solid #ddd;
+    }
+    .item-name {
+      font-size: 10px;
+    }
+    .total-row td {
+      padding-top: 4px;
+      font-weight: bold;
+      font-size: 13px;
+      border-top: 1px solid #333;
+    }
+    .footer {
+      font-size: 9px;
+      color: #888;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+
+    <!-- Header -->
+    <div class="text-center">
+      <div class="shop-name">{{ shop_name }}</div>
+      <div class="shop-details">
+        {% if shop_address %}{{ shop_address }}<br>{% endif %}
+        {% if shop_phone %}Tel: {{ shop_phone }}{% endif %}
+        {% if shop_email %} · {{ shop_email }}{% endif %}
+        {% if shop_vat %}<br>VAT: {{ shop_vat }}{% endif %}
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Sale Info -->
+    <div style="font-size:10px;">
+      <div><strong>{{ sale.sale_number }}</strong></div>
+      <div>{{ sale.created_at.strftime('%d %b %Y %H:%M') }}</div>
+      <div>Served by: {{ sale.served_by_user.full_name if sale.served_by_user else '—' }}</div>
+      {% if sale.customer %}
+      <div>Customer: {{ sale.customer.full_name }}</div>
+      {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Items -->
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left;">Item</th>
+          <th style="text-align:center;">Qty</th>
+          <th style="text-align:right;">Price</th>
+          <th style="text-align:right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="item-name">{{ item.stock_item.name if item.stock_item else 'Item' }}</td>
+          <td style="text-align:center;">{{ item.quantity }}</td>
+          <td style="text-align:right;">€{{ '%.2f'|format(item.price_charged) }}</td>
+          <td style="text-align:right;">€{{ '%.2f'|format(item.line_total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Total -->
+    <table>
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td style="text-align:right;">€{{ '%.2f'|format(sale.total) }}</td>
+      </tr>
+      <tr>
+        <td style="font-size:10px;">Paid by: {{ sale.payment_method }}</td>
+        <td></td>
+      </tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Footer -->
+    <div class="footer text-center">
+      Thank you for your purchase!
+      <br>{{ shop_name }}
+    </div>
+
+  </div>
+</body>
+</html>
