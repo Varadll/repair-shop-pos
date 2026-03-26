@@ -17,6 +17,7 @@
         {% endif %}
       </h4>
       <small class="text-muted">Created {{ invoice.created_at.strftime('%d %b %Y at %H:%M') }}</small>
+      {% if shop_vat %}<br><small class="text-muted">VAT: {{ shop_vat }}</small>{% endif %}
     </div>
   </div>
   <div class="d-flex gap-2">
@@ -258,8 +259,7 @@
       </div>
     </div>
 
-    <!-- Delete (admin only, unpaid only) -->
-    {% if current_user.is_admin and not invoice.is_paid %}
+    <!-- Delete Invoice -->
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body">
         <form method="post" action="{{ url_for('invoices.delete', invoice_id=invoice.id) }}"
@@ -270,7 +270,6 @@
         </form>
       </div>
     </div>
-    {% endif %}
 
   </div>
 </div>

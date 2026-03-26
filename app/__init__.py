@@ -46,8 +46,10 @@ def create_app(config_class=Config):
     def inject_shop():
         return dict(
             shop_name=app.config["SHOP_NAME"],
+            shop_address=app.config.get("SHOP_ADDRESS", ""),
             shop_phone=app.config["SHOP_PHONE"],
             shop_email=app.config["SHOP_EMAIL"],
+            shop_vat=app.config.get("SHOP_VAT", ""),
         )
 
     return app

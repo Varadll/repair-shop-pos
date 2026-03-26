@@ -458,18 +458,8 @@ def download_pdf(invoice_id):
 @bp.route("/<int:invoice_id>/delete", methods=["POST"])
 @login_required
 def delete(invoice_id):
-    """Delete an invoice (admin only, blocked if paid)."""
+    """Delete an invoice."""
     invoice = Invoice.query.get_or_404(invoice_id)
-
-    # Admin only
-    if not current_user.is_admin:
-        flash("Only administrators can delete invoices.", "danger")
-        return redirect(url_for("invoices.view", invoice_id=invoice.id))
-
-    # Block if paid
-    if invoice.is_paid:
-        flash("Cannot delete a paid invoice.", "danger")
-        return redirect(url_for("invoices.view", invoice_id=invoice.id))
 
     ticket_id = invoice.ticket_id
     inv_number = invoice.invoice_number
