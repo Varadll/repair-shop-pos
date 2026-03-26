@@ -1,7 +1,559 @@
 {% extends "base.html" %}
 {% block title %}Reports — {{ shop_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .stat-card {
+    border-left: 4px solid;
+    transition: transform .15s;
+  }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-card .stat-value { font-size: 1.6rem; font-weight: 700; }
+  .stat-card .stat-label { font-size: .8rem; color: #6c757d; text-transform: uppercase; letter-spacing: .5px; }
+  .border-primary-custom { border-left-color: #0d6efd !important; }
+  .border-success-custom { border-left-color: #198754 !important; }
+  .border-info-custom { border-left-color: #0dcaf0 !important; }
+  .border-warning-custom { border-left-color: #ffc107 !important; }
+  .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: .75rem; }
+  .table-report th { font-size: .8rem; text-transform: uppercase; letter-spacing: .3px; color: #6c757d; }
+  .table-report td { font-size: .9rem; }
+  .chart-container { position: relative; width: 100%; height: 280px; }
+  .progress-thin { height: 8px; }
+  .period-btn { font-size: .8rem; }
+  .period-btn.active { font-weight: 600; }
+</style>
+{% endblock %}
+
 {% block content %}
-<h4 class="mb-4">Reports</h4>
-<p class="text-muted">This module will be built next.</p>
+
+<!-- ===== HEADER + PERIOD SELECTOR ===== -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0"><i class="bi bi-graph-up"></i> Reports</h4>
+    <small class="text-muted">{{ period_label }} &middot; {{ start_date.strftime('%d %b %Y') }} – {{ end_date.strftime('%d %b %Y') }}</small>
+  </div>
+  <div class="d-flex flex-wrap gap-1 mt-2 mt-md-0">
+    {% set periods = [
+      ('today', 'Today'), ('yesterday', 'Yesterday'), ('this_week', 'This Week'),
+      ('last_week', 'Last Week'), ('this_month', 'This Month'), ('last_month', 'Last Month'),
+      ('last_30', 'Last 30'), ('last_90', 'Last 90'), ('this_year', 'This Year'),
+    ] %}
+    {% for val, label in periods %}
+      <a href="{{ url_for('reports.index', period=val) }}"
+         class="btn btn-sm {% if period == val %}btn-dark{% else %}btn-outline-secondary{% endif %} period-btn">
+        {{ label }}
+      </a>
+    {% endfor %}
+    <button class="btn btn-sm btn-outline-secondary period-btn" type="button"
+            data-bs-toggle="collapse" data-bs-target="#customRange">
+      <i class="bi bi-calendar-range"></i> Custom
+    </button>
+  </div>
+</div>
+
+<!-- Custom date range -->
+<div class="collapse {% if period == 'custom' %}show{% endif %} mb-3" id="customRange">
+  <form method="get" class="row g-2 align-items-end">
+    <input type="hidden" name="period" value="custom">
+    <div class="col-auto">
+      <label class="form-label form-label-sm mb-0">From</label>
+      <input type="date" name="start" class="form-control form-control-sm"
+             value="{{ start_date.isoformat() if period == 'custom' else '' }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label form-label-sm mb-0">To</label>
+      <input type="date" name="end" class="form-control form-control-sm"
+             value="{{ end_date.isoformat() if period == 'custom' else '' }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm btn-dark">Apply</button>
+    </div>
+  </form>
+</div>
+
+
+<!-- ===== TOP STAT CARDS ===== -->
+<div class="row g-3 mb-4">
+  <!-- Combined Revenue -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card border-primary-custom h-100">
+      <div class="card-body py-3">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-value text-primary">&euro;{{ "%.2f"|format(combined_revenue) }}</div>
+        <small class="text-muted">Invoices: &euro;{{ "%.2f"|format(invoice_total) }} &middot; POS: &euro;{{ "%.2f"|format(pos_total) }}</small>
+      </div>
+    </div>
+  </div>
+  <!-- Estimated Profit -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card border-success-custom h-100">
+      <div class="card-body py-3">
+        <div class="stat-label">Estimated Profit</div>
+        <div class="stat-value text-success">&euro;{{ "%.2f"|format(estimated_profit) }}</div>
+        <small class="text-muted">Margin: {{ profit_margin }}% &middot; Parts cost: &euro;{{ "%.2f"|format(total_parts_cost) }}</small>
+      </div>
+    </div>
+  </div>
+  <!-- Tickets Created -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card border-info-custom h-100">
+      <div class="card-body py-3">
+        <div class="stat-label">Tickets Created</div>
+        <div class="stat-value text-info">{{ tickets_created }}</div>
+        <small class="text-muted">New customers: {{ new_customers }} &middot; Total: {{ total_customers }}</small>
+      </div>
+    </div>
+  </div>
+  <!-- Outstanding Balance -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card border-warning-custom h-100">
+      <div class="card-body py-3">
+        <div class="stat-label">Outstanding Balance</div>
+        <div class="stat-value text-warning">&euro;{{ "%.2f"|format(invoice_outstanding) }}</div>
+        <small class="text-muted">Collected: &euro;{{ "%.2f"|format(invoice_collected) }} of {{ invoice_count }} invoice{{ 's' if invoice_count != 1 }}</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== REVENUE CHART ===== -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="section-title">Daily Revenue</div>
+    {% if daily_revenue|length > 0 %}
+    <div class="chart-container">
+      <canvas id="revenueChart"></canvas>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No data available for this period.</p>
+    {% endif %}
+  </div>
+</div>
+
+
+<!-- ===== REVENUE BREAKDOWN ROW ===== -->
+<div class="row g-3 mb-4">
+  <!-- Invoice Revenue by Payment Method -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-receipt"></i> Invoice Revenue ({{ invoice_count }})</div>
+        {% if invoice_by_method %}
+        <table class="table table-sm table-report mb-0">
+          <thead><tr><th>Method</th><th class="text-end">Count</th><th class="text-end">Total</th></tr></thead>
+          <tbody>
+            {% for row in invoice_by_method %}
+            <tr>
+              <td>{{ row.payment_method or 'Not Set' }}</td>
+              <td class="text-end">{{ row.count }}</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(row.total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="fw-bold">
+              <td>Total</td>
+              <td class="text-end">{{ invoice_count }}</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(invoice_total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No invoices in this period.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- POS Revenue by Payment Method -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-cart3"></i> POS Sales Revenue ({{ pos_count }})</div>
+        {% if pos_by_method %}
+        <table class="table table-sm table-report mb-0">
+          <thead><tr><th>Method</th><th class="text-end">Count</th><th class="text-end">Total</th></tr></thead>
+          <tbody>
+            {% for row in pos_by_method %}
+            <tr>
+              <td>{{ row.payment_method }}</td>
+              <td class="text-end">{{ row.count }}</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(row.total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="fw-bold">
+              <td>Total</td>
+              <td class="text-end">{{ pos_count }}</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(pos_total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No POS sales in this period.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== PROFIT BREAKDOWN ===== -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="section-title"><i class="bi bi-calculator"></i> Profit Breakdown</div>
+    <div class="row">
+      <div class="col-md-6">
+        <table class="table table-sm table-report mb-0">
+          <tbody>
+            <tr>
+              <td>Invoice Revenue</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(invoice_total) }}</td>
+            </tr>
+            <tr>
+              <td>POS Sales Revenue</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(pos_total) }}</td>
+            </tr>
+            <tr class="fw-bold border-top">
+              <td>Combined Revenue</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(combined_revenue) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-md-6">
+        <table class="table table-sm table-report mb-0">
+          <tbody>
+            <tr>
+              <td>Ticket Parts Cost</td>
+              <td class="text-end text-danger">&minus;&euro;{{ "%.2f"|format(ticket_parts_cost) }}</td>
+            </tr>
+            <tr>
+              <td>POS Parts Cost</td>
+              <td class="text-end text-danger">&minus;&euro;{{ "%.2f"|format(pos_parts_cost) }}</td>
+            </tr>
+            <tr class="fw-bold border-top">
+              <td>Estimated Gross Profit</td>
+              <td class="text-end text-success">&euro;{{ "%.2f"|format(estimated_profit) }}</td>
+            </tr>
+            <tr>
+              <td>Profit Margin</td>
+              <td class="text-end">
+                <div class="d-flex align-items-center justify-content-end gap-2">
+                  <div class="progress progress-thin flex-grow-1" style="max-width: 100px;">
+                    <div class="progress-bar bg-success" style="width: {{ profit_margin }}%"></div>
+                  </div>
+                  <span>{{ profit_margin }}%</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="mt-2">
+      <small class="text-muted">
+        <i class="bi bi-info-circle"></i>
+        Labour revenue: &euro;{{ "%.2f"|format(labour_revenue) }}.
+        Profit = Revenue &minus; Parts cost price. Does not include rent, wages, or other overheads.
+      </small>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== TICKETS ROW ===== -->
+<div class="row g-3 mb-4">
+  <!-- Tickets by Status (all time / current snapshot) -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-clipboard-check"></i> All Tickets by Status</div>
+        {% if tickets_by_status %}
+          {% for row in tickets_by_status %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>
+              <span class="badge bg-{{ status_colours.get(row.status, 'secondary') }}">{{ row.status }}</span>
+            </span>
+            <span class="fw-bold">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">No tickets yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Tickets Created in Period by Status -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-clock-history"></i> Period Tickets by Status</div>
+        {% if tickets_period_by_status %}
+          {% for row in tickets_period_by_status %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>
+              <span class="badge bg-{{ status_colours.get(row.status, 'secondary') }}">{{ row.status }}</span>
+            </span>
+            <span class="fw-bold">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">No tickets created in this period.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Tickets by Priority -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-exclamation-triangle"></i> Period Tickets by Priority</div>
+        {% if tickets_by_priority %}
+          {% for row in tickets_by_priority %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>
+              <span class="badge bg-{{ priority_colours.get(row.priority, 'secondary') }}">{{ row.priority }}</span>
+            </span>
+            <span class="fw-bold">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">No tickets created in this period.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== TECHNICIAN PERFORMANCE ===== -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="section-title"><i class="bi bi-people"></i> Technician Performance</div>
+    {% if technician_stats %}
+    <div class="table-responsive">
+      <table class="table table-sm table-report table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Technician</th>
+            <th class="text-end">Assigned</th>
+            <th class="text-end">Completed</th>
+            <th class="text-end">Open</th>
+            <th class="text-end">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tech in technician_stats %}
+          <tr>
+            <td>
+              <i class="bi bi-person-circle text-muted"></i>
+              {{ tech.full_name }}
+            </td>
+            <td class="text-end">{{ tech.total_tickets }}</td>
+            <td class="text-end">
+              {% if tech.completed > 0 %}
+              <span class="text-success">{{ tech.completed }}</span>
+              {% else %}
+              <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if tech.open > 0 %}
+              <span class="text-primary">{{ tech.open }}</span>
+              {% else %}
+              <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+            <td class="text-end">&euro;{{ "%.2f"|format(tech_revenue_map.get(tech.id, 0)) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No active technicians found.</p>
+    {% endif %}
+  </div>
+</div>
+
+
+<!-- ===== STOCK & TOP PARTS ROW ===== -->
+<div class="row g-3 mb-4">
+  <!-- Stock Valuation -->
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-box-seam"></i> Stock Valuation</div>
+        <table class="table table-sm table-report mb-0">
+          <tbody>
+            <tr>
+              <td>Total Items</td>
+              <td class="text-end fw-bold">{{ stock_summary.total_items }}</td>
+            </tr>
+            <tr>
+              <td>Total Units in Stock</td>
+              <td class="text-end fw-bold">{{ stock_summary.total_units }}</td>
+            </tr>
+            <tr>
+              <td>Stock Value (Cost)</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(stock_summary.cost_value) }}</td>
+            </tr>
+            <tr>
+              <td>Stock Value (Sell)</td>
+              <td class="text-end">&euro;{{ "%.2f"|format(stock_summary.sell_value) }}</td>
+            </tr>
+            <tr>
+              <td>
+                <a href="{{ url_for('stock.index', low_stock=1) }}" class="text-decoration-none">
+                  Low Stock Items
+                </a>
+              </td>
+              <td class="text-end">
+                {% if low_stock_count > 0 %}
+                <span class="badge bg-warning">{{ low_stock_count }}</span>
+                {% else %}
+                <span class="text-muted">0</span>
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td>Out of Stock</td>
+              <td class="text-end">
+                {% if out_of_stock_count > 0 %}
+                <span class="badge bg-danger">{{ out_of_stock_count }}</span>
+                {% else %}
+                <span class="text-muted">0</span>
+                {% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Selling Parts -->
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="section-title"><i class="bi bi-trophy"></i> Top Selling Parts ({{ period_label }})</div>
+        {% if top_parts %}
+        <div class="table-responsive">
+          <table class="table table-sm table-report table-hover mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Part Name</th>
+                <th class="text-end">Qty Sold</th>
+                <th class="text-end">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for part in top_parts %}
+              <tr>
+                <td class="text-muted">{{ loop.index }}</td>
+                <td>
+                  <a href="{{ url_for('stock.view', item_id=part.id) }}" class="text-decoration-none">
+                    {{ part.name }}
+                  </a>
+                </td>
+                <td class="text-end">{{ part.qty }}</td>
+                <td class="text-end">&euro;{{ "%.2f"|format(part.revenue) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No parts sold in this period.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const canvas = document.getElementById('revenueChart');
+  if (!canvas) return;
+
+  // Daily revenue data from Flask
+  const dailyData = {{ daily_revenue | tojson }};
+  if (!dailyData || dailyData.length === 0) return;
+
+  const labels = dailyData.map(d => {
+    const dt = new Date(d.date + 'T00:00:00');
+    return dt.toLocaleDateString('en-IE', { day: 'numeric', month: 'short' });
+  });
+
+  const invoiceData = dailyData.map(d => d.invoices);
+  const posData = dailyData.map(d => d.pos);
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Invoices',
+          data: invoiceData,
+          backgroundColor: 'rgba(13, 110, 253, 0.7)',
+          borderRadius: 3,
+        },
+        {
+          label: 'POS Sales',
+          data: posData,
+          backgroundColor: 'rgba(25, 135, 84, 0.7)',
+          borderRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': €' + ctx.parsed.y.toFixed(2);
+            },
+            footer: function(items) {
+              const total = items.reduce((s, i) => s + i.parsed.y, 0);
+              return 'Total: €' + total.toFixed(2);
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 11 }, maxRotation: 45 },
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: {
+            font: { size: 11 },
+            callback: function(v) { return '€' + v; },
+          },
+        },
+      },
+    },
+  });
+});
+</script>
 {% endblock %}

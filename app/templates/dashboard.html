@@ -3,53 +3,68 @@
 
 {% block content %}
 <h4 class="mb-4">Dashboard</h4>
+
+<!-- ── Stat Cards ────────────────────────────────────────────────── -->
 <div class="row g-3">
+  <!-- Open Tickets -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card text-bg-primary">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <div class="small text-white-50">Open Tickets</div>
-            <div class="fs-3 fw-bold">&mdash;</div>
+    <a href="{{ url_for('tickets.index', status='open') }}" class="text-decoration-none">
+      <div class="card text-bg-primary h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-white-50">Open Tickets</div>
+              <div class="fs-3 fw-bold">{{ open_tickets }}</div>
+            </div>
+            <i class="bi bi-clipboard-check fs-1 text-white-50"></i>
           </div>
-          <i class="bi bi-clipboard-check fs-1 text-white-50"></i>
         </div>
       </div>
-    </div>
+    </a>
   </div>
+
+  <!-- Ready for Collection -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card text-bg-success">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <div class="small text-white-50">Ready for Collection</div>
-            <div class="fs-3 fw-bold">&mdash;</div>
+    <a href="{{ url_for('tickets.index', status='Ready') }}" class="text-decoration-none">
+      <div class="card text-bg-success h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-white-50">Ready for Collection</div>
+              <div class="fs-3 fw-bold">{{ ready_tickets }}</div>
+            </div>
+            <i class="bi bi-check-circle fs-1 text-white-50"></i>
           </div>
-          <i class="bi bi-check-circle fs-1 text-white-50"></i>
         </div>
       </div>
-    </div>
+    </a>
   </div>
+
+  <!-- Low Stock Items -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card text-bg-warning">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <div class="small text-white-50">Low Stock Items</div>
-            <div class="fs-3 fw-bold">&mdash;</div>
+    <a href="{{ url_for('stock.index', low_stock='1') }}" class="text-decoration-none">
+      <div class="card text-bg-warning h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-white-50">Low Stock Items</div>
+              <div class="fs-3 fw-bold">{{ low_stock_count }}</div>
+            </div>
+            <i class="bi bi-exclamation-triangle fs-1 text-dark-50"></i>
           </div>
-          <i class="bi bi-exclamation-triangle fs-1 text-dark-50"></i>
         </div>
       </div>
-    </div>
+    </a>
   </div>
+
+  <!-- Today's Revenue -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card text-bg-info">
+    <div class="card text-bg-info h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="small text-white-50">Today\'s Revenue</div>
-            <div class="fs-3 fw-bold">&mdash;</div>
+            <div class="small text-white-50">Today's Revenue</div>
+            <div class="fs-3 fw-bold">&euro;{{ "%.2f"|format(todays_revenue) }}</div>
           </div>
           <i class="bi bi-currency-euro fs-1 text-white-50"></i>
         </div>
@@ -58,7 +73,70 @@
   </div>
 </div>
 
-<div class="mt-4 text-muted">
-  <p>Dashboard stats will be wired up once tickets, invoices, and stock modules are built.</p>
+<!-- ── Recent Active Tickets ────────────────────────────────────── -->
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong><i class="bi bi-clipboard-check me-1"></i> Recent Active Tickets</strong>
+    <a href="{{ url_for('tickets.index') }}" class="btn btn-sm btn-outline-primary">View All</a>
+  </div>
+  <div class="card-body p-0">
+    {% if recent_tickets %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Ticket #</th>
+            <th>Customer</th>
+            <th>Device</th>
+            <th>Fault</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Technician</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in recent_tickets %}
+          <tr style="cursor:pointer;" onclick="window.location='{{ url_for('tickets.view', ticket_id=ticket.id) }}'">
+            <td class="fw-semibold">{{ ticket.ticket_number }}</td>
+            <td>{{ ticket.customer.full_name }}</td>
+            <td>{{ ticket.device.display_name }}</td>
+            <td class="text-truncate" style="max-width: 200px;">{{ ticket.fault_description }}</td>
+            <td>
+              {% set status_colors = {
+                'Waiting': 'secondary',
+                'Diagnosed': 'info',
+                'In Progress': 'primary',
+                'Ready': 'success',
+              } %}
+              <span class="badge bg-{{ status_colors.get(ticket.status, 'secondary') }}">
+                {{ ticket.status }}
+              </span>
+            </td>
+            <td>
+              {% set priority_colors = {
+                'Low': 'secondary',
+                'Normal': 'primary',
+                'High': 'warning',
+                'Urgent': 'danger',
+              } %}
+              <span class="badge bg-{{ priority_colors.get(ticket.priority, 'secondary') }}">
+                {{ ticket.priority }}
+              </span>
+            </td>
+            <td>{{ ticket.technician.full_name if ticket.technician else '—' }}</td>
+            <td class="text-nowrap">{{ ticket.created_at.strftime('%d %b %Y') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4">
+      <i class="bi bi-clipboard-check fs-1"></i>
+      <p class="mt-2 mb-0">No active tickets right now.</p>
+    </div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
