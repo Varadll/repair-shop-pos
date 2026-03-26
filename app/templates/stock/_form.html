@@ -79,3 +79,144 @@
          value="{{ form_data.get('supplier', '') }}"
          placeholder="e.g. MobileParts Ireland, Amazon">
 </div>
+
+<!-- Barcode Scanning Section -->
+<div class="card border-0 bg-light mb-3">
+  <div class="card-body">
+    <h6 class="text-muted mb-2"><i class="bi bi-upc-scan"></i> Barcodes</h6>
+    <p class="small text-muted mb-2">Scan each unit's barcode to register it. Quantity will auto-update based on scanned barcodes.</p>
+
+    <div class="input-group input-group-sm mb-2">
+      <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+      <input type="text" id="barcodeScanInput" class="form-control"
+             placeholder="Scan barcode to add..." autocomplete="off">
+      <button type="button" class="btn btn-outline-primary" id="addBarcodeBtn">Add</button>
+    </div>
+    <div id="barcodeScanFeedback"></div>
+
+    <div id="barcodeList" class="mt-2">
+      <!-- Existing barcodes (edit mode) -->
+      {% if existing_barcodes is defined %}
+        {% for bc in existing_barcodes %}
+        <div class="d-flex align-items-center justify-content-between py-1 border-bottom barcode-entry" data-code="{{ bc.code }}">
+          <span class="small font-monospace">{{ bc.code }}</span>
+          <div>
+            <span class="badge bg-success me-1">Active</span>
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 remove-barcode-btn" title="Remove">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+          <input type="hidden" name="existing_barcodes[]" value="{{ bc.code }}">
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="mt-2 small text-muted">
+      <i class="bi bi-info-circle"></i>
+      Scanned: <strong id="barcodeCount">{{ existing_barcodes|length if existing_barcodes is defined else 0 }}</strong> barcode(s)
+      <span class="ms-2 text-muted" id="barcodeQtyNote" style="display:none;">
+        — Quantity will be set to match barcode count on save
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const scanInput = document.getElementById('barcodeScanInput');
+  const addBtn = document.getElementById('addBarcodeBtn');
+  const barcodeList = document.getElementById('barcodeList');
+  const barcodeCount = document.getElementById('barcodeCount');
+  const barcodeQtyNote = document.getElementById('barcodeQtyNote');
+  const quantityInput = document.getElementById('quantity');
+
+  function getScannedCodes() {
+    const codes = [];
+    barcodeList.querySelectorAll('.barcode-entry').forEach(function(el) {
+      codes.push(el.dataset.code.toLowerCase());
+    });
+    return codes;
+  }
+
+  function updateCount() {
+    const count = barcodeList.querySelectorAll('.barcode-entry').length;
+    barcodeCount.textContent = count;
+    if (count > 0) {
+      barcodeQtyNote.style.display = 'inline';
+      quantityInput.value = count;
+    } else {
+      barcodeQtyNote.style.display = 'none';
+    }
+  }
+
+  function addBarcode(code) {
+    code = code.trim();
+    if (!code) return;
+
+    // Check for duplicates in current list
+    if (getScannedCodes().includes(code.toLowerCase())) {
+      showFeedback('error', 'Barcode "' + code + '" already in list');
+      return;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'd-flex align-items-center justify-content-between py-1 border-bottom barcode-entry';
+    div.dataset.code = code;
+    div.innerHTML =
+      '<span class="small font-monospace">' + escapeHtml(code) + '</span>' +
+      '<div>' +
+        '<span class="badge bg-info me-1">New</span>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 remove-barcode-btn" title="Remove">' +
+          '<i class="bi bi-x"></i>' +
+        '</button>' +
+      '</div>' +
+      '<input type="hidden" name="new_barcodes[]" value="' + escapeHtml(code) + '">';
+
+    barcodeList.appendChild(div);
+    updateCount();
+    showFeedback('success', 'Added: ' + code);
+  }
+
+  function showFeedback(type, msg) {
+    const fb = document.getElementById('barcodeScanFeedback');
+    fb.innerHTML = '<div class="alert alert-' + (type === 'success' ? 'success' : 'danger') +
+      ' py-1 px-2 small mb-0">' + msg + '</div>';
+    setTimeout(function() { fb.innerHTML = ''; }, 3000);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // Add barcode on Enter or button click
+  scanInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addBarcode(this.value);
+      this.value = '';
+      this.focus();
+    }
+  });
+
+  addBtn.addEventListener('click', function() {
+    addBarcode(scanInput.value);
+    scanInput.value = '';
+    scanInput.focus();
+  });
+
+  // Remove barcode (delegated)
+  barcodeList.addEventListener('click', function(e) {
+    const btn = e.target.closest('.remove-barcode-btn');
+    if (btn) {
+      btn.closest('.barcode-entry').remove();
+      updateCount();
+    }
+  });
+
+  // Initial count
+  updateCount();
+})();
+</script>

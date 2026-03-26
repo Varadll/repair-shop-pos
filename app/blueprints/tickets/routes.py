@@ -5,7 +5,7 @@ from app.blueprints.tickets import bp
 from app.extensions import db
 from app.models import (
     Ticket, Customer, Device, User, TicketProgressLog,
-    StockItem, TicketPartUsed,
+    StockItem, TicketPartUsed, Barcode,
 )
 
 
@@ -549,6 +549,20 @@ def add_part(ticket_id):
         price_charged=price_charged,
     )
     db.session.add(part_used)
+
+    # Deactivate barcodes for used quantity (if item has barcodes)
+    from datetime import datetime, timezone as tz
+    now = datetime.now(tz.utc)
+    active_barcodes = (
+        Barcode.query
+        .filter_by(stock_item_id=stock_item.id, is_active=True)
+        .order_by(Barcode.created_at.asc())
+        .limit(quantity)
+        .all()
+    )
+    for bc in active_barcodes:
+        bc.is_active = False
+        bc.used_at = now
 
     # Deduct from stock
     stock_item.quantity -= quantity

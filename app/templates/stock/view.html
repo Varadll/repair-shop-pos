@@ -79,6 +79,58 @@
       </div>
     </div>
 
+    <!-- Barcodes -->
+    {% if active_barcodes or used_barcodes %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">
+          <i class="bi bi-upc-scan"></i> Barcodes
+          <span class="badge bg-primary ms-1">{{ active_barcodes|length }} active</span>
+          {% if used_barcodes %}
+          <span class="badge bg-secondary ms-1">{{ used_barcodes|length }} used</span>
+          {% endif %}
+        </h6>
+
+        {% if active_barcodes %}
+        <div class="mb-2">
+          <small class="text-muted fw-semibold">Active:</small>
+          <div class="mt-1">
+            {% for bc in active_barcodes %}
+            <div class="d-flex align-items-center justify-content-between py-1 {% if not loop.last %}border-bottom{% endif %}">
+              <span class="small font-monospace">{{ bc.code }}</span>
+              <div>
+                <span class="text-muted small">{{ bc.created_at.strftime('%d %b %Y') }}</span>
+                <form method="post" action="{{ url_for('stock.remove_barcode', item_id=item.id) }}"
+                      class="d-inline ms-1" onsubmit="return confirm('Remove this barcode?');">
+                  <input type="hidden" name="barcode_id" value="{{ bc.id }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove barcode">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if used_barcodes %}
+        <div>
+          <small class="text-muted fw-semibold">Recently Used:</small>
+          <div class="mt-1">
+            {% for bc in used_barcodes %}
+            <div class="d-flex align-items-center justify-content-between py-1 {% if not loop.last %}border-bottom{% endif %}">
+              <span class="small font-monospace text-muted text-decoration-line-through">{{ bc.code }}</span>
+              <span class="text-muted small">{{ bc.used_at.strftime('%d %b %Y %H:%M') if bc.used_at else '—' }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Profit Margin -->
     {% if item.cost_price > 0 and item.sell_price > 0 %}
     <div class="card border-0 shadow-sm mb-3">

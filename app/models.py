@@ -222,17 +222,42 @@ class StockItem(db.Model):
 
     ticket_uses = db.relationship("TicketPartUsed", backref="stock_item", lazy="dynamic")
     pos_sale_items = db.relationship("POSSaleItem", backref="stock_item", lazy="dynamic")
+    barcodes = db.relationship("Barcode", backref="stock_item", lazy="dynamic",
+                               cascade="all, delete-orphan")
 
     @property
     def is_low_stock(self):
         return self.quantity <= self.low_stock_threshold
+
+    def sync_barcode_quantity(self):
+        """Update quantity to match active barcode count (if item uses barcodes)."""
+        total_barcodes = self.barcodes.count()
+        if total_barcodes > 0:
+            self.quantity = self.barcodes.filter_by(is_active=True).count()
 
     def __repr__(self):
         return f"<StockItem {self.name} (qty: {self.quantity})>"
 
 
 # ---------------------------------------------------------------------------
-# Table 8 — Ticket Parts Used
+# Table 8 — Barcodes (individual unit tracking for stock items)
+# ---------------------------------------------------------------------------
+class Barcode(db.Model):
+    __tablename__ = "barcodes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    stock_item_id = db.Column(db.Integer, db.ForeignKey("stock_items.id"), nullable=False, index=True)
+    is_active = db.Column(db.Boolean, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    used_at = db.Column(db.DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<Barcode {self.code} (active={self.is_active})>"
+
+
+# ---------------------------------------------------------------------------
+# Table 9 — Ticket Parts Used
 # ---------------------------------------------------------------------------
 class TicketPartUsed(db.Model):
     __tablename__ = "ticket_parts_used"

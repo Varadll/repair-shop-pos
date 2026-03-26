@@ -21,9 +21,10 @@
           <h6 class="text-muted mb-2"><i class="bi bi-search"></i> Add Items</h6>
           <div class="position-relative">
             <input type="text" id="itemSearch" class="form-control form-control-sm"
-                   placeholder="Search stock by name, SKU, or compatible device..." autocomplete="off">
+                   placeholder="Scan barcode or search by name / SKU..." autocomplete="off">
             <div id="searchResults" class="list-group position-absolute w-100 shadow"
                  style="z-index:1050; max-height:250px; overflow-y:auto; display:none;"></div>
+            <div id="scanFeedback"></div>
           </div>
         </div>
       </div>
@@ -258,10 +259,87 @@
     return div.innerHTML;
   }
 
-  // ---------- Stock Item Search ----------
+  // ---------- Stock Item Search + Barcode Scan Detection ----------
   let searchTimeout = null;
   const itemSearch = document.getElementById('itemSearch');
   const searchResults = document.getElementById('searchResults');
+
+  // Barcode scan detection: scanners type chars very fast then press Enter
+  let scanBuffer = [];
+  let lastScanKeyTime = 0;
+  const SCAN_MAX_CHAR_GAP_MS = 50;  // Max ms between chars during a scan
+  const MIN_BARCODE_LENGTH = 4;
+
+  function showScanFeedback(type, message) {
+    const fb = document.getElementById('scanFeedback');
+    fb.innerHTML = '<div class="alert alert-' + (type === 'success' ? 'success' : 'danger') +
+      ' py-1 px-2 small mt-1 mb-0"><i class="bi bi-' +
+      (type === 'success' ? 'check-circle' : 'exclamation-triangle') +
+      '"></i> ' + escapeHtml(message) + '</div>';
+    setTimeout(function() { fb.innerHTML = ''; }, 3000);
+  }
+
+  function handleBarcodeScan(barcode) {
+    searchResults.style.display = 'none';
+    clearTimeout(searchTimeout);
+
+    fetch('/stock/api/search?q=' + encodeURIComponent(barcode) + '&limit=1')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.length > 0 && data[0].barcode_match) {
+          addToCart(data[0]);
+          itemSearch.value = '';
+          showScanFeedback('success', data[0].name + ' added to cart');
+        } else {
+          showScanFeedback('error', 'No product found for barcode: ' + barcode);
+          itemSearch.value = '';
+        }
+        itemSearch.focus();
+      })
+      .catch(function() {
+        showScanFeedback('error', 'Search failed. Please try again.');
+        itemSearch.focus();
+      });
+  }
+
+  itemSearch.addEventListener('keydown', function(e) {
+    const now = Date.now();
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = this.value.trim();
+      if (!val) return;
+
+      // Check if this was a barcode scan (rapid input)
+      if (val.length >= MIN_BARCODE_LENGTH && scanBuffer.length >= MIN_BARCODE_LENGTH) {
+        const firstKeyTime = scanBuffer[0];
+        const totalTime = now - firstKeyTime;
+        const avgGap = totalTime / scanBuffer.length;
+
+        if (avgGap < SCAN_MAX_CHAR_GAP_MS) {
+          // Rapid input detected — this is a barcode scan
+          handleBarcodeScan(val);
+          scanBuffer = [];
+          return;
+        }
+      }
+
+      // Not a rapid scan, but user pressed Enter — try barcode lookup anyway
+      // (handles manual barcode entry or pasted barcodes)
+      handleBarcodeScan(val);
+      scanBuffer = [];
+      return;
+    }
+
+    // Track keystrokes for timing analysis
+    if (e.key.length === 1) {
+      if (now - lastScanKeyTime > 500) {
+        scanBuffer = [];
+      }
+      scanBuffer.push(now);
+      lastScanKeyTime = now;
+    }
+  });
 
   itemSearch.addEventListener('input', function() {
     clearTimeout(searchTimeout);
@@ -272,7 +350,7 @@
     }
     searchTimeout = setTimeout(function() {
       fetch('/stock/api/search?q=' + encodeURIComponent(q) + '&limit=8')
-        .then(r => r.json())
+        .then(function(r) { return r.json(); })
         .then(function(data) {
           searchResults.innerHTML = '';
           if (data.length === 0) {
@@ -310,7 +388,7 @@
           });
           searchResults.style.display = 'block';
         });
-    }, 250);
+    }, 300);  // Slightly longer debounce to avoid triggering during barcode scan
   });
 
   // Close search results when clicking outside

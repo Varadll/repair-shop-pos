@@ -5,7 +5,7 @@ from flask import (
 from flask_login import login_required, current_user
 from app.blueprints.pos import bp
 from app.extensions import db
-from app.models import POSSale, POSSaleItem, StockItem, Customer
+from app.models import POSSale, POSSaleItem, StockItem, Customer, Barcode
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +171,10 @@ def create():
         db.session.add(sale)
         db.session.flush()  # Get sale.id before creating items
 
-        # --- Create sale items + deduct stock ---
+        # --- Create sale items + deduct stock + deactivate barcodes ---
+        from datetime import datetime, timezone as tz
+        now = datetime.now(tz.utc)
+
         for si in sale_items:
             pos_item = POSSaleItem(
                 sale_id=sale.id,
@@ -180,6 +183,18 @@ def create():
                 price_charged=si["price_charged"],
             )
             db.session.add(pos_item)
+
+            # Deactivate barcodes for sold quantity (if item has barcodes)
+            active_barcodes = (
+                Barcode.query
+                .filter_by(stock_item_id=si["stock_item"].id, is_active=True)
+                .order_by(Barcode.created_at.asc())
+                .limit(si["quantity"])
+                .all()
+            )
+            for bc in active_barcodes:
+                bc.is_active = False
+                bc.used_at = now
 
             # Auto-deduct stock
             si["stock_item"].quantity -= si["quantity"]

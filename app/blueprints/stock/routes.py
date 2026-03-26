@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.blueprints.stock import bp
 from app.extensions import db
-from app.models import StockItem, TicketPartUsed, POSSaleItem
+from app.models import StockItem, Barcode, TicketPartUsed, POSSaleItem
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +189,14 @@ def add():
     if request.method == "POST":
         cleaned, errors = _validate_stock_form(request.form)
 
+        # Validate new barcodes
+        new_barcodes = request.form.getlist("new_barcodes[]")
+        new_barcodes = [b.strip() for b in new_barcodes if b.strip()]
+        for code in new_barcodes:
+            existing = Barcode.query.filter(db.func.lower(Barcode.code) == code.lower()).first()
+            if existing:
+                errors.append(f"Barcode '{code}' is already assigned to '{existing.stock_item.name}'.")
+
         if errors:
             for e in errors:
                 flash(e, "danger")
@@ -200,6 +208,16 @@ def add():
 
         item = StockItem(**cleaned)
         db.session.add(item)
+        db.session.flush()  # Get item.id before adding barcodes
+
+        # Create barcode records
+        for code in new_barcodes:
+            db.session.add(Barcode(code=code, stock_item_id=item.id))
+
+        # If barcodes were scanned, quantity = barcode count
+        if new_barcodes:
+            item.quantity = len(new_barcodes)
+
         db.session.commit()
 
         flash(f"Stock item '{item.name}' added successfully.", "success")
@@ -236,11 +254,16 @@ def view(item_id):
         .all()
     )
 
+    active_barcodes = item.barcodes.filter_by(is_active=True).order_by(Barcode.created_at.desc()).all()
+    used_barcodes = item.barcodes.filter_by(is_active=False).order_by(Barcode.used_at.desc()).limit(20).all()
+
     return render_template(
         "stock/view.html",
         item=item,
         ticket_uses=ticket_uses,
         pos_uses=pos_uses,
+        active_barcodes=active_barcodes,
+        used_barcodes=used_barcodes,
     )
 
 
@@ -255,24 +278,49 @@ def edit(item_id):
             request.form, is_edit=True, current_item=item
         )
 
+        # Validate new barcodes
+        new_barcodes = request.form.getlist("new_barcodes[]")
+        new_barcodes = [b.strip() for b in new_barcodes if b.strip()]
+        for code in new_barcodes:
+            existing = Barcode.query.filter(db.func.lower(Barcode.code) == code.lower()).first()
+            if existing:
+                errors.append(f"Barcode '{code}' is already assigned to '{existing.stock_item.name}'.")
+
         if errors:
             for e in errors:
                 flash(e, "danger")
+            existing_barcodes = item.barcodes.filter_by(is_active=True).all()
             return render_template(
                 "stock/edit.html",
                 item=item,
                 categories=_get_all_categories(),
                 form_data=request.form,
+                existing_barcodes=existing_barcodes,
             )
 
         # Apply changes
         for key, value in cleaned.items():
             setattr(item, key, value)
 
+        # Handle barcode removals (barcodes in DB but not in submitted existing_barcodes[])
+        kept_codes = set(b.strip().lower() for b in request.form.getlist("existing_barcodes[]") if b.strip())
+        for bc in item.barcodes.filter_by(is_active=True).all():
+            if bc.code.lower() not in kept_codes:
+                db.session.delete(bc)
+
+        # Add new barcodes
+        for code in new_barcodes:
+            db.session.add(Barcode(code=code, stock_item_id=item.id))
+
+        # Sync quantity if item uses barcodes
+        db.session.flush()
+        item.sync_barcode_quantity()
+
         db.session.commit()
         flash(f"Stock item '{item.name}' updated.", "success")
         return redirect(url_for("stock.view", item_id=item.id))
 
+    existing_barcodes = item.barcodes.filter_by(is_active=True).all()
     form_data = {
         "name": item.name,
         "category": item.category,
@@ -289,6 +337,7 @@ def edit(item_id):
         item=item,
         categories=_get_all_categories(),
         form_data=form_data,
+        existing_barcodes=existing_barcodes,
     )
 
 
@@ -372,8 +421,9 @@ def delete(item_id):
 @bp.route("/api/search")
 @login_required
 def api_search():
-    """Return stock items as JSON for AJAX dropdowns (used by ticket add-part).
+    """Return stock items as JSON for AJAX dropdowns.
     Query param: q (search term), limit (max results, default 10).
+    Supports barcode exact match (priority) and fuzzy text search.
     """
     from flask import jsonify
 
@@ -383,6 +433,26 @@ def api_search():
     if not search or len(search) < 1:
         return jsonify([])
 
+    # Phase 1: Exact barcode match (highest priority)
+    barcode_hit = Barcode.query.filter(
+        db.func.lower(Barcode.code) == search.lower(),
+        Barcode.is_active == True,
+    ).first()
+
+    if barcode_hit:
+        item = barcode_hit.stock_item
+        return jsonify([{
+            "id": item.id,
+            "name": item.name,
+            "sku": item.sku,
+            "category": item.category,
+            "quantity": item.quantity,
+            "sell_price": item.sell_price,
+            "is_low_stock": item.is_low_stock,
+            "barcode_match": True,
+        }])
+
+    # Phase 2: Fuzzy text search by name, SKU, compatible devices
     like = f"%{search}%"
     items = (
         StockItem.query
@@ -407,7 +477,34 @@ def api_search():
             "quantity": item.quantity,
             "sell_price": item.sell_price,
             "is_low_stock": item.is_low_stock,
+            "barcode_match": False,
         }
         for item in items
     ]
     return jsonify(result)
+
+
+@bp.route("/<int:item_id>/remove-barcode", methods=["POST"])
+@login_required
+def remove_barcode(item_id):
+    """Remove (delete) an active barcode from a stock item."""
+    from flask import jsonify
+
+    item = StockItem.query.get_or_404(item_id)
+    barcode_id = request.form.get("barcode_id", type=int)
+
+    if not barcode_id:
+        flash("No barcode specified.", "danger")
+        return redirect(url_for("stock.view", item_id=item.id))
+
+    barcode = Barcode.query.filter_by(id=barcode_id, stock_item_id=item.id, is_active=True).first()
+    if not barcode:
+        flash("Barcode not found or already used.", "danger")
+        return redirect(url_for("stock.view", item_id=item.id))
+
+    db.session.delete(barcode)
+    item.sync_barcode_quantity()
+    db.session.commit()
+
+    flash(f"Barcode '{barcode.code}' removed.", "success")
+    return redirect(url_for("stock.view", item_id=item.id))

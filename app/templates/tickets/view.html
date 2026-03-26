@@ -150,8 +150,18 @@
         <p class="text-muted small mb-3">No parts added yet.</p>
         {% endif %}
 
-        <!-- Add Part Form -->
-        <div class="border-top pt-3">
+        <!-- Barcode Scan for Quick Part Add -->
+        <div class="border-top pt-3 mb-2">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+            <input type="text" id="partBarcodeInput" class="form-control form-control-sm"
+                   placeholder="Scan barcode to add part..." autocomplete="off">
+          </div>
+          <div id="partScanFeedback"></div>
+        </div>
+
+        <!-- Add Part Form (manual selection) -->
+        <div>
           <form method="post" action="{{ url_for('tickets.add_part', ticket_id=ticket.id) }}"
                 class="row g-2 align-items-end" id="addPartForm">
             <div class="col-md-4">
@@ -385,5 +395,54 @@
       priceField.placeholder = 'Auto from sell price';
     }
   });
+
+  // Barcode scan for quick part add
+  (function() {
+    const barcodeInput = document.getElementById('partBarcodeInput');
+    if (!barcodeInput) return;
+
+    const partSelect = document.getElementById('partSelect');
+    const partPrice = document.getElementById('partPrice');
+    const feedbackEl = document.getElementById('partScanFeedback');
+
+    function showFeedback(type, msg) {
+      feedbackEl.innerHTML = '<div class="alert alert-' + (type === 'success' ? 'success' : 'danger') +
+        ' py-1 px-2 small mt-1 mb-0">' + msg + '</div>';
+      setTimeout(function() { feedbackEl.innerHTML = ''; }, 3000);
+    }
+
+    barcodeInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var val = this.value.trim();
+        if (!val) return;
+
+        fetch('/stock/api/search?q=' + encodeURIComponent(val) + '&limit=1')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.length > 0 && data[0].barcode_match) {
+              var item = data[0];
+              // Auto-select in dropdown
+              for (var i = 0; i < partSelect.options.length; i++) {
+                if (partSelect.options[i].value == item.id) {
+                  partSelect.selectedIndex = i;
+                  partPrice.value = item.sell_price.toFixed(2);
+                  showFeedback('success', 'Found: ' + item.name);
+                  break;
+                }
+              }
+            } else {
+              showFeedback('error', 'No product found for barcode: ' + val);
+            }
+            barcodeInput.value = '';
+            barcodeInput.focus();
+          })
+          .catch(function() {
+            showFeedback('error', 'Search failed. Try again.');
+            barcodeInput.focus();
+          });
+      }
+    });
+  })();
 </script>
 {% endblock %}
